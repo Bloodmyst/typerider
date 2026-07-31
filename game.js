@@ -735,6 +735,9 @@ const AudioSys = {
 
 // ===================== MOTS (nature, sans accents) =====================
 const WORDS = {
+  // vocabulaire enfants : mots simples du quotidien
+  kids4: ['eau','mer','jus','sel','riz','nez','dos','ami','roi','fee','the','sac','bol','jeu','chat','loup','ours','lion','bleu','vert','rose','noir','lune','vent','main','pied','pain','lait','chou','miel','papa','bebe','velo','coq','ane','oie','mur','pot','lit','cle'],
+  kids: ['chien','lapin','poule','vache','souris','cheval','mouton','cochon','canard','oiseau','maman','papi','mamie','ecole','ballon','pomme','poire','banane','fraise','cerise','gateau','bonbon','tete','bras','reine','tigre','singe','zebre','girafe','rouge','jaune','blanc','soleil','etoile','fleur','arbre','herbe','sable','plage','neige','pluie','nuage','livre','table','porte','robot','pirate','dragon'],
   short: ['mer','roc','feu','eau','pic','lac','val','cap','ile','arc','air','nid','bec','pin','pre','col','vol','gel','ciel','vent','bois','loup','cerf','aube','lune','pont','houx','sable','ruche','pluie','fleur','herbe','sapin','nuage','orage','neige','brume','givre','galet','foret','orme','etang','dune','mare','baie','anse','cime','gorge','crete','butte','ravin','delta','oasis','jonc','iris','rose','chene','hetre','saule','frene','cedre','aulne','ours','lynx','aigle','biche','merle','geai','faon','hibou','bison','recif','genet','lande','marne','crabe','loriot'],
   medium: ['riviere','prairie','vallee','sommet','rocher','source','aurore','mousse','etoile','soleil','chemin','sentier','falaise','colline','torrent','cascade','glacier','ruisseau','feuille','branche','racine','ecorce','buisson','tempete','eclair','horizon','erable','luciole','orchidee','roseau','jungle','corail','tilleul','bouleau','renard','lievre','fougere','bruyere','lavande','jasmin','muguet','sorbier','cypres','sequoia','platane','crevasse','plateau','canyon','volcan','geyser','lagune','savane','faucon','loutre','castor','mouflon','chamois','belette','toundra','moraine','baobab','anemone','tulipe','gentiane','aubepine','digitale','archipel'],
   long: ['montagne','papillon','libellule','hirondelle','crepuscule','escalade','panorama','avalanche','brouillard','chevreuil','ecureuil','marmotte','myrtille','framboise','campagne','clairiere','alpiniste','belvedere','stalactite','coquelicot','chataignier','sauterelle','coccinelle','peninsule','bouquetin','salamandre','grenouille','scarabee','araignee','chrysalide','eglantine','paquerette','pissenlit','tournesol','genevrier','clematite','primevere','cordillere','permafrost','eucalyptus','edelweiss','peuplier','noisette','chouette','herisson','estuaire','sanglier','blaireau'],
@@ -744,7 +747,16 @@ const WORDS = {
 function pickWord(wave, existing) {
   let pool;
   const r = Math.random();
-  if (wave <= 2) pool = r < 0.75 ? WORDS.short : WORDS.medium;
+  const d = DIFFS[diffIndex];
+  if (d.pool === 'poussin') {
+    // tout-petits : mots de 3-4 lettres, quelques mots simples plus longs ensuite
+    pool = (wave <= 2 || r < 0.7) ? WORDS.kids4 : WORDS.kids;
+  } else if (d.pool === 'enfant') {
+    if (wave <= 2) pool = r < 0.5 ? WORDS.kids4 : WORDS.kids;
+    else if (wave <= 4) pool = r < 0.55 ? WORDS.kids : WORDS.short;
+    else pool = r < 0.4 ? WORDS.kids : (r < 0.8 ? WORDS.short : WORDS.medium);
+  }
+  else if (wave <= 2) pool = r < 0.75 ? WORDS.short : WORDS.medium;
   else if (wave <= 4) pool = r < 0.4 ? WORDS.short : (r < 0.85 ? WORDS.medium : WORDS.long);
   else if (wave <= 7) pool = r < 0.2 ? WORDS.short : (r < 0.6 ? WORDS.medium : WORDS.long);
   else pool = r < 0.15 ? WORDS.short : (r < 0.5 ? WORDS.medium : (r < 0.85 ? WORDS.long : WORDS.verylong));
@@ -764,6 +776,21 @@ let state = ST_TITLE;
 const WAVES_PER_MANCHE = 4; // une manche = 4 vagues (un cycle jour/nuit complet)
 const MAX_LIVES = 5;
 
+// ===================== DIFFICULTÉS =====================
+// fallMul : multiplie le temps de chute (plus grand = plus lent)
+// countMul/gapMul : nombre de mots par vague / espacement des apparitions
+// dropMul : fréquence des bonus
+const DIFFS = [
+  { id: 'poussin', name: 'POUSSIN', desc: 'POUR LES PETITS DOIGTS', color: '#7affc0',
+    fallMul: 2.2, countMul: 0.55, gapMul: 1.8, lives: 5, dropMul: 2.0, pool: 'poussin' },
+  { id: 'enfant', name: 'ENFANT', desc: 'MOTS SIMPLES, CHUTE LENTE', color: '#7ad9ff',
+    fallMul: 1.55, countMul: 0.8, gapMul: 1.35, lives: 4, dropMul: 1.5, pool: 'enfant' },
+  { id: 'normal', name: 'NORMAL', desc: 'LE JEU CLASSIQUE', color: '#ffe97a',
+    fallMul: 1, countMul: 1, gapMul: 1, lives: 3, dropMul: 1, pool: 'full' },
+  { id: 'expert', name: 'EXPERT', desc: 'PLUS VITE, PLUS DENSE !', color: '#ff6b6b',
+    fallMul: 0.78, countMul: 1.2, gapMul: 0.82, lives: 3, dropMul: 1, pool: 'full' },
+];
+
 function loadJSON(key, def) {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : def; } catch (e) { return def; }
 }
@@ -771,8 +798,19 @@ function saveJSON(key, val) {
   try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
 }
 
+let diffIndex = Math.min(DIFFS.length - 1, Math.max(0, loadJSON('typerider.diff', 2)));
+
 let score = 0, best = 0;
-try { best = parseInt(localStorage.getItem('typerider.best') || '0', 10) || 0; } catch (e) {}
+// meilleur score séparé par difficulté (l'ancienne clé sert de valeur au mode normal)
+function loadBest() {
+  const v = loadJSON('typerider.best.' + DIFFS[diffIndex].id, null);
+  if (v !== null) return v;
+  if (DIFFS[diffIndex].id === 'normal') {
+    try { return parseInt(localStorage.getItem('typerider.best') || '0', 10) || 0; } catch (e) { return 0; }
+  }
+  return 0;
+}
+best = loadBest();
 
 // progression persistante (crédits, achats, équipement)
 let credits = loadJSON('typerider.credits', 0);
@@ -886,12 +924,13 @@ const WORD_SCALE = 3;
 function charW() { return 6 * WORD_SCALE * Math.max(1, Math.round(PX / 3)); }
 function wordScale() { return WORD_SCALE * Math.max(1, Math.round(PX / 3)); }
 
-function waveWordCount(w) { return 5 + w * 2; }
-function waveFallTime(w) { return Math.max(6, 19 - w * 1.5); }
-function waveSpawnGap(w) { return Math.max(1.0, 3.4 - w * 0.22); }
+function waveWordCount(w) { return Math.max(3, Math.round((5 + w * 2) * DIFFS[diffIndex].countMul)); }
+function waveFallTime(w) { return Math.max(6, 19 - w * 1.5) * DIFFS[diffIndex].fallMul; }
+function waveSpawnGap(w) { return Math.max(1.0, 3.4 - w * 0.22) * DIFFS[diffIndex].gapMul; }
 
 function startGame() {
-  score = 0; combo = 0; lives = 3; waveNum = 0;
+  score = 0; combo = 0; lives = DIFFS[diffIndex].lives; waveNum = 0;
+  best = loadBest();
   words = []; bullets = []; particles = []; popups = [];
   activeWord = null; gameT = 0;
   stats = { typed: 0, errors: 0, wordsDone: 0, bestCombo: 0 };
@@ -1043,7 +1082,7 @@ function useBoomerang() {
 
 // butin possible à chaque mot terminé
 function maybeDrop(word) {
-  const r = Math.random();
+  const r = Math.random() / DIFFS[diffIndex].dropMul;
   const p = letterPos(word, Math.floor(word.text.length / 2));
   if (r < 0.05 && lives < MAX_LIVES) {
     lives++;
@@ -1079,6 +1118,15 @@ window.addEventListener('keydown', (e) => {
   if (state === ST_TITLE || state === ST_OVER) {
     if (e.key === 'Enter') { startGame(); }
     else if (e.key === 'b' || e.key === 'B') { shopReturn = 'title'; shopIndex = 0; lastGain = 0; state = ST_SHOP; }
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      const dir = e.key === 'ArrowLeft' ? -1 : 1;
+      diffIndex = (diffIndex + dir + DIFFS.length) % DIFFS.length;
+      saveJSON('typerider.diff', diffIndex);
+      best = loadBest();
+      AudioSys.tone(520 + diffIndex * 90, 0.06, 'square', 0.04);
+      if (state === ST_OVER) state = ST_TITLE; // retour au menu pour changer de mode
+    }
+    else if (e.key === 'Escape' && state === ST_OVER) { state = ST_TITLE; }
     return;
   }
   if (state === ST_PAUSE) {
@@ -1274,7 +1322,7 @@ function update(dt) {
         state = ST_OVER;
         if (score > best) {
           best = score;
-          try { localStorage.setItem('typerider.best', String(best)); } catch (e) {}
+          saveJSON('typerider.best.' + DIFFS[diffIndex].id, best);
         }
         AudioSys.over();
         return;
@@ -1600,7 +1648,7 @@ function draw(dt) {
     const blink = Math.sin(gameT * 5) > -0.4;
     drawCenteredPanel([
       { text: 'VAGUE ' + waveNum, scale: 6, color: '#ffe97a', gap: 14 },
-      { text: 'NIVEAU ' + niveauCourant() + ' - VAGUE ' + ((waveNum - 1) % WAVES_PER_MANCHE + 1) + '/' + WAVES_PER_MANCHE + ' DE LA MANCHE', scale: 2, color: '#ffd93b', gap: 10 },
+      { text: 'MODE ' + DIFFS[diffIndex].name + '  -  NIVEAU ' + niveauCourant() + ' - VAGUE ' + ((waveNum - 1) % WAVES_PER_MANCHE + 1) + '/' + WAVES_PER_MANCHE, scale: 2, color: DIFFS[diffIndex].color, gap: 10 },
       { text: waveNum === 1 ? 'TAPEZ LES MOTS AVANT L\'IMPACT !' : 'PLUS VITE, PLUS NOMBREUX...', scale: 2, color: '#dfe6ff', gap: 8 },
       { text: blink ? 'PREPAREZ-VOUS' : ' ', scale: 2, color: '#7ad9ff', gap: 0 },
     ]);
@@ -1621,7 +1669,8 @@ function draw(dt) {
       { text: 'MOTS ' + stats.wordsDone + '   PRECISION ' + acc + '/100   MEILLEUR COMBO ' + stats.bestCombo, scale: 2, color: '#9fb3e8', gap: 10 },
       { text: 'MPM MOYEN ' + avgMpm + '   MPM MAX ' + peakMpm + '   NIVEAU ' + niveauCourant(), scale: 2, color: '#9fb3e8', gap: 10 },
       { text: 'CREDITS ' + credits, scale: 2, color: '#ffd93b', gap: 20 },
-      { text: Math.sin(gameT * 4) > -0.3 ? 'ENTREE POUR REJOUER' : ' ', scale: 3, color: '#7affc0', gap: 0 },
+      { text: Math.sin(gameT * 4) > -0.3 ? 'ENTREE POUR REJOUER' : ' ', scale: 3, color: '#7affc0', gap: 12 },
+      { text: 'ECHAP : MENU (CHANGER DE DIFFICULTE)', scale: 2, color: '#9fb3e8', gap: 0 },
     ]);
   }
 
@@ -1716,20 +1765,36 @@ function drawTitle() {
     'BONUS : 1 = REMONTE-TEMPS   2 = BOOMERANG DU FUTUR',
     'FINISSEZ UNE MANCHE DE 4 VAGUES POUR GAGNER DES CREDITS',
   ];
-  let ry = H * 0.58;
+  // mise en page fluide sous les règles (évite tout chevauchement)
+  let ry = H * 0.53;
   for (const r of rules) {
     drawPixelTextOutline(ctx, r, W / 2, ry, 2, '#dfe6ff', '#101528', 'center');
     ry += 26;
   }
 
+  // sélecteur de difficulté
+  const d = DIFFS[diffIndex];
+  ry += 16;
+  drawPixelTextOutline(ctx, 'DIFFICULTE', W / 2, ry, 2, '#9fb3e8', '#101528', 'center');
+  ry += 24;
+  const arrows = Math.sin(gameT * 5) > 0 ? 2 : 0;
+  drawPixelTextOutline(ctx, '<', W / 2 - textWidth(d.name, 3) / 2 - 30 - arrows, ry, 3, '#dfe6ff', '#101528', 'center');
+  drawPixelTextOutline(ctx, d.name, W / 2, ry, 3, d.color, '#101528', 'center');
+  drawPixelTextOutline(ctx, '>', W / 2 + textWidth(d.name, 3) / 2 + 30 + arrows, ry, 3, '#dfe6ff', '#101528', 'center');
+  ry += 28;
+  drawPixelTextOutline(ctx, d.desc, W / 2, ry, 2, '#dfe6ff', '#101528', 'center');
+  ry += 36;
+
   if (Math.sin(gameT * 4) > -0.3) {
-    drawPixelTextOutline(ctx, 'APPUYEZ SUR ENTREE', W / 2, H * 0.78, 4, '#7affc0', '#101528', 'center');
+    drawPixelTextOutline(ctx, 'APPUYEZ SUR ENTREE', W / 2, ry, 4, '#7affc0', '#101528', 'center');
   }
-  drawPixelTextOutline(ctx, 'ECHAP : PAUSE   F2 : SON   B : BOUTIQUE', W / 2, H * 0.78 + 44, 2, '#9fb3e8', '#101528', 'center');
+  ry += 42;
+  drawPixelTextOutline(ctx, 'FLECHES : DIFFICULTE   ECHAP : PAUSE   F2 : SON   B : BOUTIQUE', W / 2, ry, 2, '#9fb3e8', '#101528', 'center');
+  ry += 26;
   const meta = [];
-  if (best > 0) meta.push('MEILLEUR SCORE ' + best);
+  if (best > 0) meta.push('MEILLEUR (' + DIFFS[diffIndex].name + ') ' + best);
   meta.push('CREDITS ' + credits);
-  drawPixelTextOutline(ctx, meta.join('   '), W / 2, H * 0.78 + 70, 2, '#ffe97a', '#101528', 'center');
+  drawPixelTextOutline(ctx, meta.join('   '), W / 2, ry, 2, '#ffe97a', '#101528', 'center');
   drawTurret();
 }
 
