@@ -17,6 +17,17 @@ Le jeu est 100 % HTML5, sans dépendance ni installation :
 
   puis ouvrez <http://localhost:8123>.
 
+## Difficultés
+
+Choix sur l'écran titre avec les **flèches ← →** (mémorisé, meilleur score séparé par mode) :
+
+| Mode | Public | Particularités |
+|---|---|---|
+| 🐣 Poussin | 5-7 ans | mots de 3-4 lettres du quotidien (chat, lune, papa…), chute très lente, peu de mots, 5 vies, bonus fréquents |
+| 🧒 Enfant | 8-11 ans | mots simples, chute lente, 4 vies, bonus plus fréquents |
+| ⭐ Normal | tous | le jeu classique, 3 vies |
+| 🔥 Expert | dactylos aguerris | chute rapide, vagues denses |
+
 ## Règles
 
 - Les **mots tombent du ciel** ; tapez la première lettre d'un mot pour le cibler
