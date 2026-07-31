@@ -34,18 +34,49 @@ Le jeu est 100 % HTML5, sans dépendance ni installation :
   ×5 (15), ×6 (25), ×8 (40). Une faute ou un mot au sol remet le combo à zéro.
 - Le meilleur score est sauvegardé localement.
 
-## Vagues
+## Vagues, manches et niveaux
 
 Chaque vague apporte **plus de mots, plus rapides**, des mots plus longs…
 et change l'ambiance du décor (jour → coucher de soleil → nuit étoilée → aube),
-avec un parallax de montagnes enneigées, forêts de sapins et prairies fleuries
-qui défile de gauche à droite.
+avec un parallax de montagnes enneigées, forêts de sapins et prairies fleuries.
+
+Une **manche = 4 vagues** (un cycle jour/nuit complet). Finir une manche fait
+gagner **un niveau** et des **crédits** (150 + 100 × niveau + bonus de combo),
+puis ouvre la **boutique**.
+
+## Power-ups
+
+Lâchés aléatoirement quand on termine un mot (on démarre avec 1 de chaque) :
+
+| Bonus | Touche | Effet |
+|---|---|---|
+| ⏪ Machine à remonter le temps | 1 (ou &) | les mots **non validés** remontent de 3 secondes |
+| 🪃 Boomerang du futur | 2 (ou é) | révèle le **prochain mot** de la vague (inutilisable en fin de vague/manche, non consommé dans ce cas) |
+| ❤ Vie supplémentaire | — | +1 vie immédiate (max 5), plus rare |
+
+## Boutique
+
+Accessible entre les manches et depuis l'écran titre (touche **B**).
+Les crédits, achats et équipements sont **sauvegardés localement**.
+
+- **Skins de tourelle** : bleu classique, or royal, néon rose, vert camo, rouge lave
+- **Effets visuels** (actifs dès l'achat) : balles arc-en-ciel, explosions étoilées, traînée de comète
+- **Accessoires** (un à la fois) : drapeau, antenne radar, chapeau haut-de-forme
+
+Navigation : flèches ↑/↓, Entrée pour acheter/équiper, Échap pour sortir.
+
+## Statistiques de frappe
+
+- **MPM** (mots par minute, fenêtre glissante de 10 s) et **précision** affichés en jeu.
+- En fin de partie : MPM moyen, MPM max, précision, meilleur combo, niveau atteint.
 
 ## Touches
 
 | Touche | Action |
 |---|---|
 | A–Z | taper les mots (toutes les lettres, P et M compris) |
+| 1 / 2 | power-ups (remonte-temps / boomerang) |
+| B | boutique (depuis l'écran titre) |
 | Entrée | commencer / rejouer |
 | Échap | pause / reprendre |
 | F2 | couper le son |
