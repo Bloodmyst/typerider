@@ -30,8 +30,8 @@ const GROUND_LR = 14;    // hauteur du sol en pixels basse-rés
 let groundY = 0;         // y du sol en px réels
 
 function resize() {
-  W = window.innerWidth;
-  H = window.innerHeight;
+  W = Math.max(1, window.innerWidth);
+  H = Math.max(1, window.innerHeight);
   canvas.width = W;
   canvas.height = H;
   uiCanvas.width = W;
@@ -1907,7 +1907,7 @@ function camKick(dx, dy, amt) { camX += dx * amt; camY += dy * amt; }
 
 // ===================== STUDIO VFX (post-traitement WebGL) =====================
 const VFX_ITEMS = [
-  { key: 'master', sub: 'GENERAL', name: 'TOUS LES VFX (F8)' },
+  { key: 'master', sub: 'GENERAL', name: 'TOUS LES VFX (TOUCHE 0)' },
   { key: 'bloom', sub: 'LUMIERE', name: 'LUEUR CINEMA' },
   { key: 'rays', sub: 'LUMIERE', name: 'RAYONS DE LUMIERE' },
   { key: 'flare', sub: 'LUMIERE', name: 'REFLETS D\'OBJECTIF' },
@@ -2323,21 +2323,23 @@ function maybeDrop(word) {
 window.addEventListener('keydown', (e) => {
   AudioSys.init();
 
-  // F2 coupe le son, F3 change de disposition, F4 affiche le clavier : jamais en conflit avec les lettres
-  if (e.key === 'F2') { AudioSys.muted = !AudioSys.muted; return; }
-  if (e.key === 'F3') {
+  // réglages sur les touches chiffrées (repérées par leur position, donc aussi en AZERTY et sur Mac,
+  // où les touches F demandent Fn) ou sur F2/F3/F4/F8 : jamais en conflit avec les lettres
+  const code = /^Numpad\d$/.test(e.code) ? 'Digit' + e.code.slice(6) : e.code;
+  if (e.key === 'F2' || code === 'Digit7') { AudioSys.muted = !AudioSys.muted; e.preventDefault(); return; }
+  if (e.key === 'F3' || code === 'Digit8') {
     kbPref.layout = kbPref.layout === 'azerty' ? 'qwerty' : 'azerty';
     saveJSON('typerider.kb', kbPref);
     e.preventDefault();
     return;
   }
-  if (e.key === 'F4') {
+  if (e.key === 'F4' || code === 'Digit9') {
     kbPref.show = !keyboardVisible();
     saveJSON('typerider.kb', kbPref);
     e.preventDefault();
     return;
   }
-  if (e.key === 'F8') {
+  if (e.key === 'F8' || code === 'Digit0') {
     // compare en un geste le pixel art brut et sa version VFX
     vfxPrefs.master = !vfxPrefs.master;
     saveJSON('typerider.vfx', vfxPrefs);
@@ -2382,8 +2384,8 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') { state = ST_PAUSE; return; }
 
   // power-ups : 1/& = remonte-temps, 2/é = boomerang (clavier AZERTY inclus)
-  if (e.key === '1' || e.key === '&') { useRewind(); return; }
-  if (e.key === '2' || e.key === 'é' || e.key === 'É') { useBoomerang(); return; }
+  if (e.key === '1' || e.key === '&' || code === 'Digit1') { useRewind(); return; }
+  if (e.key === '2' || e.key === 'é' || e.key === 'É' || code === 'Digit2') { useBoomerang(); return; }
 
   if (e.key.length !== 1) return;
   let ch = e.key.toUpperCase();
@@ -3442,12 +3444,32 @@ const TITLE_RULES = [
   ['CHAQUE NIVEAU FAIT EVOLUER VOTRE VEHICULE, JUSQU\'AU CHAR !'],
 ];
 
+// téléphone ou tablette sans souris : il faut un clavier physique pour jouer
+const TOUCH_ONLY = window.matchMedia && matchMedia('(hover: none) and (pointer: coarse)').matches;
+
+function drawTouchNotice() {
+  const s = Math.max(3, Math.min(9, Math.floor((W - 24) / 62)));
+  const y = Math.round(H * 0.18);
+  drawPixelTextOutline(ctx, 'TYPE', W / 2 - s, y, s, '#ffe97a', '#101528', 'right');
+  drawPixelTextOutline(ctx, 'RIDER', W / 2 + s, y, s, '#7ad9ff', '#101528', 'left');
+  const lines = ['TYPERIDER SE JOUE', 'SUR ORDINATEUR,', 'AVEC UN VRAI CLAVIER.', '', 'A BIENTOT SUR PC OU MAC !'];
+  const ts = W < 420 ? 2 : 3;
+  let ly = y + 7 * s + 40;
+  ctx.fillStyle = 'rgba(8,12,28,0.72)';
+  ctx.fillRect(12, ly - 18, W - 24, lines.length * (7 * ts + 14) + 24);
+  for (const l of lines) {
+    drawPixelTextShadow(ctx, l, W / 2, ly, ts, l.startsWith('A BIENTOT') ? '#7affc0' : '#f2f5ff', 'center');
+    ly += 7 * ts + 14;
+  }
+}
+
 function drawTitle() {
+  if (TOUCH_ONLY) { drawTouchNotice(); return; }
   const d = DIFFS[diffIndex];
   const bob = Math.round(Math.sin(gameT * 1.5) * 4);
   const hints = [
     'FLECHES : DIFFICULTE   B : BOUTIQUE   G : GARAGE',
-    'ECHAP : PAUSE   F2 : SON   F3/F4 : CLAVIER   F8 : VFX',
+    'ECHAP : PAUSE   7 : SON   8/9 : CLAVIER   0 : VFX',
   ];
   const meta = (best > 0 ? 'MEILLEUR (' + d.name + ') ' + best + '   ' : '') + 'CREDITS ' + credits;
   // lettres aérées quand la ligne tient dans l'écran, serrées sinon
@@ -3546,6 +3568,8 @@ let lastT = 0;
 function frame(t) {
   let dt = Math.min(0.05, (t - lastT) / 1000 || 0.016);
   lastT = t;
+  // certains navigateurs changent la taille (onglet caché, zoom) sans prévenir
+  if (Math.max(1, innerWidth) !== W || Math.max(1, innerHeight) !== H) resize();
   if (hitStop > 0) { hitStop -= dt; dt *= 0.08; }
   if (state !== ST_PAUSE) update(dt);
   draw(dt);
@@ -3558,8 +3582,8 @@ turret.x = W / 2;
 turret.y = groundY + 4;
 requestAnimationFrame(frame);
 
-// petit hook de debug/test (n'affecte pas le jeu)
-window.__TR = {
+// hook de test, réservé au développement : ouvrir le jeu avec ?debug dans l'adresse
+if (/[?&]debug\b/.test(location.search)) window.__TR = {
   get state() { return state; },
   get score() { return score; },
   get combo() { return combo; },
@@ -3588,6 +3612,7 @@ window.__TR = {
   get weather() { return weather; },
   step(sec) {
     const dt = 1 / 60;
+    if (Math.max(1, innerWidth) !== W || Math.max(1, innerHeight) !== H) resize();
     for (let i = 0; i < sec * 60; i++) { if (state !== ST_PAUSE) update(dt); draw(dt); }
     present();
   },
