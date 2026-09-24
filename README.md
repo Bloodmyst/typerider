@@ -18,6 +18,18 @@ Le jeu est 100 % HTML5, sans dépendance ni installation :
 
   puis ouvrez <http://localhost:8123>.
 
+### Mise en ligne
+
+Le jeu est un site statique : il se publie tel quel, sans étape de construction.
+
+- **GitHub Pages** (dépôt public) : *Settings → Pages → Deploy from a branch → `master` / `/ (root)`*.
+  Le jeu est alors en ligne sur `https://bloodmyst.github.io/typerider/` et se met à jour à chaque push.
+- **Cloudflare Pages ou Netlify** (dépôt privé possible) : connecter le dépôt, commande de build vide,
+  dossier publié = la racine.
+
+Les sauvegardes (crédits, records, achats) sont propres à chaque adresse web : la version en ligne
+repart de zéro. Le hook de test `window.__TR` n'existe que si l'adresse contient `?debug`.
+
 ## Difficultés
 
 Choix sur l'écran titre avec les **flèches ← →** (mémorisé, meilleur score séparé par mode) :
@@ -170,10 +182,12 @@ Affiché par défaut en modes Poussin et Enfant ; **F4** l'affiche ou le masque,
 | B / G | boutique / garage (depuis l'écran titre) |
 | Entrée | commencer / rejouer |
 | Échap | pause / reprendre |
-| F2 | couper le son |
-| F3 | clavier AZERTY / QWERTY |
-| F4 | afficher / masquer le clavier à l'écran |
-| F8 | activer / couper tous les VFX |
+| 7 (ou F2) | couper le son |
+| 8 (ou F3) | clavier AZERTY / QWERTY |
+| 9 (ou F4) | afficher / masquer le clavier à l'écran |
+| 0 (ou F8) | activer / couper tous les VFX |
+
+Les touches chiffrées marchent sur tous les claviers (AZERTY, QWERTY, Mac) sans Maj ni Fn.
 
 ## Fichiers
 
