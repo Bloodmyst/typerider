@@ -1,8 +1,9 @@
 # TypeRider — Tape ou coule !
 
 Jeu de dactylographie en **pixel art coloré** : des mots tombent du ciel, tapez-les
-avant qu'ils ne touchent le sol. Chaque lettre juste déclenche un tir de la tourelle
-qui dégomme la lettre. Une faute ? Le mot continue de tomber et on le reprend au début.
+avant qu'ils ne touchent le sol. Chaque lettre juste déclenche un tir de votre
+véhicule, qui dégomme la lettre. Une faute ? Le mot continue de tomber et on le
+reprend au début.
 
 ## Lancer le jeu (PC & Mac)
 
@@ -55,6 +56,26 @@ Une **manche = 4 vagues** (un cycle jour/nuit complet). Finir une manche fait
 gagner **un niveau** et des **crédits** (150 + 100 × niveau + bonus de combo),
 puis ouvre la **boutique**.
 
+## Véhicules
+
+On commence chaque partie **à pied**, et le véhicule évolue à chaque niveau
+(toutes les 2 vagues en modes Poussin et Enfant, à chaque manche sinon),
+avec une petite scène d'évolution. Le décor défile plus vite avec les véhicules rapides.
+
+| Niveau | Véhicule | Arme |
+|---|---|---|
+| 1 | À pied | lance-pierre |
+| 2 | Trottinette | pistolet à eau |
+| 3 | Vélo | lance-balles |
+| 4 | Voiture | canon à confettis |
+| 5 | Moto | blaster laser |
+| 6 | Buggy | double blaster |
+| 7 | Jeep 4×4 | mini-roquettes |
+| 8 | Blindé | canon plasma |
+| 9 | Char futuriste | canon lourd |
+
+Le **garage** (touche **G**) garde la collection des véhicules déjà atteints.
+
 ## Power-ups
 
 Lâchés aléatoirement quand on termine un mot (on démarre avec 1 de chaque) :
@@ -67,14 +88,18 @@ Lâchés aléatoirement quand on termine un mot (on démarre avec 1 de chaque) :
 
 ## Boutique
 
-Accessible entre les manches et depuis l'écran titre (touche **B**).
-Les crédits, achats et équipements sont **sauvegardés localement**.
+Accessible entre les manches et depuis l'écran titre (touche **B**), avec un
+aperçu animé du véhicule. Les crédits, achats et équipements sont **sauvegardés localement**.
 
-- **Skins de tourelle** : bleu classique, or royal, néon rose, vert camo, rouge lave
-- **Effets visuels** (actifs dès l'achat) : balles arc-en-ciel, explosions étoilées, traînée de comète
-- **Accessoires** (un à la fois) : drapeau, antenne radar, chapeau haut-de-forme
+| Onglet | Contenu |
+|---|---|
+| Couleurs | bleu classique, or royal, néon rose, vert camo, rouge lave (appliquées à tous les véhicules) |
+| Accessoires (un à la fois) | drapeau, antenne radar, lunettes de soleil, chapeau haut-de-forme, couronne |
+| Effets (bibliothèque) | à combiner librement, chacun s'active ou se désactive : balles arc-en-ciel, traînée de comète, explosions étoilées, confettis de victoire, aura dorée, traînée néon, étincelles, traces arc-en-ciel |
+| Garage | les 9 véhicules, verrouillés tant qu'ils n'ont pas été atteints |
 
-Navigation : flèches ↑/↓, Entrée pour acheter/équiper, Échap pour sortir.
+Navigation : ←/→ pour changer d'onglet, ↑/↓ pour choisir, Entrée pour
+acheter / équiper / activer, Échap pour sortir.
 
 ## Statistiques de frappe
 
@@ -87,7 +112,7 @@ Navigation : flèches ↑/↓, Entrée pour acheter/équiper, Échap pour sortir
 |---|---|
 | A–Z | taper les mots (toutes les lettres, P et M compris) |
 | 1 / 2 | power-ups (remonte-temps / boomerang) |
-| B | boutique (depuis l'écran titre) |
+| B / G | boutique / garage (depuis l'écran titre) |
 | Entrée | commencer / rejouer |
 | Échap | pause / reprendre |
 | F2 | couper le son |
@@ -96,4 +121,5 @@ Navigation : flèches ↑/↓, Entrée pour acheter/équiper, Échap pour sortir
 
 - `index.html` — page du jeu
 - `style.css` — plein écran, rendu pixelisé
-- `game.js` — moteur complet (rendu pixel art procédural, parallax, audio synthé rétro, logique de jeu)
+- `vehicles.js` — les 9 véhicules en pixel art procédural (roues, jambes, armes, accessoires, contour automatique)
+- `game.js` — moteur du jeu (décor en parallax, effets, audio synthé rétro, boutique, logique de jeu)
