@@ -91,6 +91,8 @@ const FONT = {
 "'":['00100','00100','01000','00000','00000','00000','00000'],
 '>':['01000','00100','00010','00001','00010','00100','01000'],
 '<':['00010','00100','01000','10000','01000','00100','00010'],
+'(':['00010','00100','01000','01000','01000','00100','00010'],
+')':['01000','00100','00010','00010','00010','00100','01000'],
 '♥':['00000','01010','11111','11111','01110','00100','00000'],
 '/':['00001','00010','00010','00100','01000','01000','10000'],
 ' ':['00000','00000','00000','00000','00000','00000','00000'],
@@ -114,17 +116,25 @@ function getGlyph(ch, color, scale) {
   return c;
 }
 
-function textWidth(text, scale) { return text.length * 6 * scale - scale; }
+// adv = avance par caractère en unités de glyphe (6 = serré, 7 = aéré)
+function textWidth(text, scale, adv) { return text.length * (adv || 6) * scale - (adv ? adv - 5 : 1) * scale; }
 
-function drawPixelText(c2, text, x, y, scale, color, align) {
+function drawPixelText(c2, text, x, y, scale, color, align, adv) {
+  adv = adv || 6;
   text = String(text).toUpperCase();
-  if (align === 'center') x -= Math.round(textWidth(text, scale) / 2);
-  else if (align === 'right') x -= textWidth(text, scale);
+  if (align === 'center') x -= Math.round(textWidth(text, scale, adv) / 2);
+  else if (align === 'right') x -= textWidth(text, scale, adv);
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
     if (ch !== ' ') c2.drawImage(getGlyph(ch, color, scale), Math.round(x), Math.round(y));
-    x += 6 * scale;
+    x += adv * scale;
   }
+}
+
+// texte avec ombre portée nette : plus lisible qu'un contour sur un panneau sombre
+function drawPixelTextShadow(c2, text, x, y, scale, color, align, adv) {
+  drawPixelText(c2, text, x + scale, y + scale, scale, '#060914', align, adv);
+  drawPixelText(c2, text, x, y, scale, color, align, adv);
 }
 
 function drawPixelTextOutline(c2, text, x, y, scale, color, outline, align) {
@@ -3280,67 +3290,112 @@ function drawShop(dt) {
     W / 2, H - 32, 2, '#7ad9ff', '#101528', 'center');
 }
 
+// règles de l'écran titre, par groupes (un espace sépare chaque groupe)
+const TITLE_RULES = [
+  ['DES MOTS TOMBENT DU CIEL : TAPEZ-LES AVANT L\'IMPACT',
+   'UNE LETTRE JUSTE = UN TIR, UNE ERREUR = ON REPREND LE MOT'],
+  ['ENCHAINEZ SANS FAUTE POUR MULTIPLIER LE SCORE',
+   'BONUS : 1 = REMONTE-TEMPS   2 = BOOMERANG DU FUTUR'],
+  ['CHAQUE NIVEAU FAIT EVOLUER VOTRE VEHICULE, JUSQU\'AU CHAR !'],
+];
+
 function drawTitle() {
-  const cy = H * 0.19;
-  const bob = Math.sin(gameT * 1.5) * 6;
-  // logo
-  drawPixelTextOutline(ctx, 'TYPE', W / 2 - 10, cy - 40 + bob, 9, '#ffe97a', '#101528', 'right');
-  drawPixelTextOutline(ctx, 'RIDER', W / 2 + 10, cy - 40 + bob, 9, '#7ad9ff', '#101528', 'left');
-  drawPixelTextOutline(ctx, 'TAPE OU COULE !', W / 2, cy + 42 + bob, 2, '#ff5d8f', '#101528', 'center');
-
-  // mot de démonstration qui tombe
-  const demoY = cy + 80 + Math.sin(gameT * 0.8) * 8;
-  ctx.fillStyle = 'rgba(8,12,28,0.62)';
-  const demoW = textWidth('MONTAGNE', 3) + 14;
-  ctx.fillRect(W / 2 - demoW / 2 - 4, demoY - 8, demoW + 8, 37);
-  const done = Math.floor((gameT * 2.5) % 12);
-  const demo = 'MONTAGNE';
-  for (let i = 0; i < demo.length; i++) {
-    const col = i < done ? '#4a5680' : (i === done ? '#ffe97a' : '#f2f5ff');
-    if (i < done - 2) continue;
-    drawPixelText(ctx, demo[i], W / 2 - textWidth(demo, 3) / 2 + i * 18, demoY, 3, col);
-  }
-
-  const rules = [
-    'DES MOTS TOMBENT DU CIEL : TAPEZ-LES AVANT L\'IMPACT',
-    'UNE LETTRE JUSTE = UN TIR, UNE ERREUR = ON REPREND LE MOT',
-    'ENCHAINEZ SANS FAUTE POUR MULTIPLIER LE SCORE',
-    'BONUS : 1 = REMONTE-TEMPS   2 = BOOMERANG DU FUTUR',
-    'CHAQUE NIVEAU FAIT EVOLUER VOTRE VEHICULE, JUSQU\'AU CHAR !',
-  ];
-  // mise en page fluide sous les règles (évite tout chevauchement)
-  let ry = demoY + 56;
-  for (const r of rules) {
-    drawPixelTextOutline(ctx, r, W / 2, ry, 2, '#dfe6ff', '#101528', 'center');
-    ry += 24;
-  }
-
-  // sélecteur de difficulté
   const d = DIFFS[diffIndex];
-  ry += 12;
-  drawPixelTextOutline(ctx, 'DIFFICULTE', W / 2, ry, 2, '#9fb3e8', '#101528', 'center');
-  ry += 22;
-  const arrows = Math.sin(gameT * 5) > 0 ? 2 : 0;
-  drawPixelTextOutline(ctx, '<', W / 2 - textWidth(d.name, 3) / 2 - 30 - arrows, ry, 3, '#dfe6ff', '#101528', 'center');
-  drawPixelTextOutline(ctx, d.name, W / 2, ry, 3, d.color, '#101528', 'center');
-  drawPixelTextOutline(ctx, '>', W / 2 + textWidth(d.name, 3) / 2 + 30 + arrows, ry, 3, '#dfe6ff', '#101528', 'center');
-  ry += 28;
-  drawPixelTextOutline(ctx, d.desc, W / 2, ry, 2, '#dfe6ff', '#101528', 'center');
-  ry += 32;
+  const bob = Math.round(Math.sin(gameT * 1.5) * 4);
+  const hints = [
+    'FLECHES : DIFFICULTE   B : BOUTIQUE   G : GARAGE',
+    'ECHAP : PAUSE   F2 : SON   F4 : CLAVIER   F3 : ' + (kbPref.layout === 'azerty' ? 'AZERTY' : 'QWERTY'),
+  ];
+  const meta = (best > 0 ? 'MEILLEUR (' + d.name + ') ' + best + '   ' : '') + 'CREDITS ' + credits;
+  // lettres aérées quand la ligne tient dans l'écran, serrées sinon
+  const all = TITLE_RULES.flat().concat(hints, [meta]);
+  const adv = all.every(t => textWidth(t, 2, 7) <= W - 64) ? 7 : 6;
 
-  if (Math.sin(gameT * 4) > -0.3) {
-    drawPixelTextOutline(ctx, 'APPUYEZ SUR ENTREE', W / 2, ry, 4, '#7affc0', '#101528', 'center');
+  // blocs : hauteur du texte + espace après (les espaces se resserrent si l'écran est bas)
+  const build = (demo) => {
+    const b = [{ id: 'logo', h: 63, gap: 18 }, { id: 'sub', h: 21, gap: 26 }];
+    if (demo) b.push({ id: 'demo', h: 37, gap: 30 });
+    TITLE_RULES.forEach((grp, gi) => grp.forEach((t, li) => b.push({
+      id: 'rule', t, grp: gi, h: 14,
+      gap: li < grp.length - 1 ? 12 : (gi < TITLE_RULES.length - 1 ? 26 : 32),
+    })));
+    b.push({ id: 'dlabel', h: 14, gap: 12 }, { id: 'dname', h: 21, gap: 12 }, { id: 'ddesc', h: 14, gap: 28 });
+    b.push({ id: 'enter', h: 28, gap: 28 });
+    hints.forEach(t => b.push({ id: 'hint', t, h: 14, gap: 12 }));
+    b.push({ id: 'meta', t: meta, h: 14, gap: 0 });
+    return b;
+  };
+  const top = 20, pad = 16;
+  const bottom = turret.y - (V.list[garageMax - 1].h + 10) * vu();
+  let blocks = build(true), k = 1;
+  const fit = (bl) => {
+    const fixed = bl.reduce((s, x) => s + x.h, 0) + pad * 2;
+    const gaps = bl.reduce((s, x) => s + x.gap, 0);
+    return Math.min(1, (bottom - top - fixed) / gaps);
+  };
+  k = fit(blocks);
+  if (k < 0.7) { blocks = build(false); k = fit(blocks); }
+  k = Math.max(0.3, k);
+  let y = top;
+  for (const b of blocks) {
+    if (b.id === 'rule' && b.grp === 0 && b === blocks.find(x => x.id === 'rule')) y += pad;
+    b.y = Math.round(y);
+    y += b.h + b.gap * k;
   }
-  ry += 40;
-  drawPixelTextOutline(ctx, 'FLECHES : DIFFICULTE   B : BOUTIQUE   G : GARAGE', W / 2, ry, 2, '#9fb3e8', '#101528', 'center');
-  ry += 22;
-  drawPixelTextOutline(ctx, 'ECHAP : PAUSE   F2 : SON   F4 : CLAVIER   F3 : ' + (kbPref.layout === 'azerty' ? 'AZERTY' : 'QWERTY'),
-    W / 2, ry, 2, '#9fb3e8', '#101528', 'center');
-  ry += 24;
-  const meta = [];
-  if (best > 0) meta.push('MEILLEUR (' + DIFFS[diffIndex].name + ') ' + best);
-  meta.push('CREDITS ' + credits);
-  drawPixelTextOutline(ctx, meta.join('   '), W / 2, ry, 2, '#ffe97a', '#101528', 'center');
+
+  // panneau sombre derrière tout le texte courant
+  const first = blocks.find(b => b.id === 'rule'), last = blocks[blocks.length - 1];
+  const pw = Math.min(W - 16, Math.max(...all.map(t => textWidth(t, 2, adv))) + 64);
+  const px = Math.round(W / 2 - pw / 2), py = first.y - pad, ph = last.y + last.h + pad - py;
+  ctx.fillStyle = 'rgba(8,12,28,0.72)';
+  ctx.fillRect(px, py, pw, ph);
+  ctx.fillStyle = 'rgba(159,179,232,0.35)';
+  ctx.fillRect(px, py, pw, 2);
+  ctx.fillRect(px, py + ph - 2, pw, 2);
+  ctx.fillRect(px, py, 2, ph);
+  ctx.fillRect(px + pw - 2, py, 2, ph);
+
+  for (const b of blocks) {
+    const cy = b.y;
+    if (b.id === 'logo') {
+      drawPixelTextOutline(ctx, 'TYPE', W / 2 - 10, cy + bob, 9, '#ffe97a', '#101528', 'right');
+      drawPixelTextOutline(ctx, 'RIDER', W / 2 + 10, cy + bob, 9, '#7ad9ff', '#101528', 'left');
+    } else if (b.id === 'sub') {
+      drawPixelTextOutline(ctx, 'UN VOYAGE DE L\'ECRITURE', W / 2, cy + bob, 3, '#ff5d8f', '#101528', 'center');
+    } else if (b.id === 'demo') {
+      // mot de démonstration qui s'écrit
+      const demo = 'MONTAGNE';
+      const demoW = textWidth(demo, 3) + 14;
+      ctx.fillStyle = 'rgba(8,12,28,0.62)';
+      ctx.fillRect(Math.round(W / 2 - demoW / 2 - 4), cy, demoW + 8, 37);
+      const done = Math.floor((gameT * 2.5) % 12);
+      for (let i = 0; i < demo.length; i++) {
+        if (i < done - 2) continue;
+        const col = i < done ? '#4a5680' : (i === done ? '#ffe97a' : '#f2f5ff');
+        drawPixelText(ctx, demo[i], W / 2 - textWidth(demo, 3) / 2 + i * 18, cy + 8, 3, col);
+      }
+    } else if (b.id === 'rule') {
+      drawPixelTextShadow(ctx, b.t, W / 2, cy, 2, b.grp === 2 ? '#ffe97a' : '#f2f5ff', 'center', adv);
+    } else if (b.id === 'dlabel') {
+      drawPixelTextShadow(ctx, 'DIFFICULTE', W / 2, cy, 2, '#9fb3e8', 'center', adv);
+    } else if (b.id === 'dname') {
+      const arrows = Math.sin(gameT * 5) > 0 ? 2 : 0;
+      const half = textWidth(d.name, 3, 7) / 2;
+      drawPixelTextShadow(ctx, '<', W / 2 - half - 30 - arrows, cy, 3, '#dfe6ff', 'center');
+      drawPixelTextShadow(ctx, d.name, W / 2, cy, 3, d.color, 'center', 7);
+      drawPixelTextShadow(ctx, '>', W / 2 + half + 30 + arrows, cy, 3, '#dfe6ff', 'center');
+    } else if (b.id === 'ddesc') {
+      drawPixelTextShadow(ctx, d.desc, W / 2, cy, 2, '#dfe6ff', 'center', adv);
+    } else if (b.id === 'enter') {
+      // pulse doucement au lieu de clignoter : le texte reste toujours lisible
+      const col = Math.sin(gameT * 4) > 0 ? '#7affc0' : '#c8ffe4';
+      drawPixelTextShadow(ctx, 'APPUYEZ SUR ENTREE', W / 2, cy, 4, col, 'center', 7);
+    } else if (b.id === 'hint') {
+      drawPixelTextShadow(ctx, b.t, W / 2, cy, 2, '#9fb3e8', 'center', adv);
+    } else if (b.id === 'meta') {
+      drawPixelTextShadow(ctx, b.t, W / 2, cy, 2, '#ffe97a', 'center', adv);
+    }
+  }
 }
 
 // ===================== BOUCLE PRINCIPALE =====================

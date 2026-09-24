@@ -1,4 +1,4 @@
-# TypeRider — Tape ou coule !
+# TypeRider — Un voyage de l'écriture
 
 Jeu de dactylographie en **pixel art coloré** : des mots tombent du ciel, tapez-les
 avant qu'ils ne touchent le sol. Chaque lettre juste déclenche un tir de votre
