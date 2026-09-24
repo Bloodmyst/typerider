@@ -49,8 +49,29 @@ Choix sur l'écran titre avec les **flèches ← →** (mémorisé, meilleur sco
 ## Vagues, manches et niveaux
 
 Chaque vague apporte **plus de mots, plus rapides**, des mots plus longs…
-et change l'ambiance du décor (jour → coucher de soleil → nuit étoilée → aube),
-avec un parallax de montagnes enneigées, forêts de sapins et prairies fleuries.
+et change le moment de la journée (jour → coucher de soleil → nuit étoilée → aube).
+Le soleil (ou la lune) **traverse le ciel** pendant la vague.
+
+### Un décor par niveau
+
+À chaque niveau, en même temps que le véhicule évolue, le décor change
+(puis le cycle recommence après le volcan) :
+
+| Décor | Détails |
+|---|---|
+| Montagnes | sommets enneigés, forêts de sapins, prairies fleuries |
+| Forêt profonde | lisière dense, grands arbres, rayons de soleil à travers la canopée |
+| Canyon | plateaux rocheux striés, dunes, saguaros fleuris |
+| Bord de mer | mer scintillante, voiliers, palmiers, mouettes, coquillages |
+| Ville néon | gratte-ciel aux fenêtres allumées, enseignes néon, lampadaires, route |
+| Volcan | cratères fumants, coulées de lave, arbres morts, braises, fissures rougeoyantes |
+
+### Météo dynamique
+
+Chaque vague tire une météo adaptée au décor, annoncée au début de la vague :
+pluie (avec éclaboussures au sol), orage (éclairs et tonnerre), neige (qui tient
+au sol), brume, tempête de sable, pluie de cendres. Un **arc-en-ciel** apparaît
+quand la pluie s'arrête.
 
 Une **manche = 4 vagues** (un cycle jour/nuit complet). Finir une manche fait
 gagner **un niveau** et des **crédits** (150 + 100 × niveau + bonus de combo),
