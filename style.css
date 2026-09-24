@@ -7,11 +7,22 @@ html, body {
   background: #0a0e2a;
 }
 
-#game {
+canvas {
+  position: fixed;
+  left: 0;
+  top: 0;
   display: block;
   width: 100vw;
   height: 100vh;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   cursor: default;
+}
+
+#vfx {
+  display: none;
+}
+
+#ui {
+  pointer-events: none;
 }
