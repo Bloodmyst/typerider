@@ -122,6 +122,24 @@ aperçu animé du véhicule. Les crédits, achats et équipements sont **sauvega
 Navigation : ←/→ pour changer d'onglet, ↑/↓ pour choisir, Entrée pour
 acheter / équiper / activer, Échap pour sortir.
 
+## Mots spéciaux
+
+À partir de la vague 2, certains mots ont un cadre et une icône (un peu plus fréquents en modes enfants) :
+
+| Mot | Effet quand on le termine |
+|---|---|
+| ⭐ Doré | bonus de crédits (5 par lettre) |
+| ❄ Gelé | tous les mots tombent 5 fois moins vite pendant 4 secondes |
+| 💣 Bombe | fait exploser les mots voisins, qui rapportent des points |
+
+## Clavier à l'écran
+
+Un clavier en bas à gauche **allume la prochaine touche à taper** et indique
+le doigt à utiliser (une couleur par doigt, repères sur F et J). Chaque frappe
+éclaire la touche en vert (juste) ou en rouge (erreur).
+Affiché par défaut en modes Poussin et Enfant ; **F4** l'affiche ou le masque,
+**F3** passe d'AZERTY à QWERTY.
+
 ## Statistiques de frappe
 
 - **MPM** (mots par minute, fenêtre glissante de 10 s) et **précision** affichés en jeu.
@@ -137,6 +155,8 @@ acheter / équiper / activer, Échap pour sortir.
 | Entrée | commencer / rejouer |
 | Échap | pause / reprendre |
 | F2 | couper le son |
+| F3 | clavier AZERTY / QWERTY |
+| F4 | afficher / masquer le clavier à l'écran |
 
 ## Fichiers
 

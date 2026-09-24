@@ -1526,6 +1526,13 @@ const AudioSys = {
       default: this.tone(880, 0.09, 'square', 0.05, -500);
     }
   },
+  coin() {
+    this.tone(988, 0.08, 'square', 0.05);
+    setTimeout(() => this.tone(1319, 0.2, 'square', 0.05), 80);
+  },
+  freeze() {
+    [1568, 1319, 1047, 880, 784].forEach((f, i) => setTimeout(() => this.tone(f, 0.12, 'triangle', 0.05), i * 60));
+  },
   evolve() {
     [262, 330, 392, 523, 659, 784, 1047].forEach((f, i) => setTimeout(() => this.tone(f, 0.14, 'square', 0.05), i * 170));
   },
@@ -1770,6 +1777,35 @@ let playT = 0;                  // temps de jeu effectif (hors pause/menus)
 let keyLog = [];                // horodatage des lettres justes (fenêtre MPM)
 let peakMpm = 0;
 
+// ===================== CLAVIER À L'ÉCRAN =====================
+const KB_LAYOUTS = {
+  azerty: ['AZERTYUIOP', 'QSDFGHJKLM', 'WXCVBN'],
+  qwerty: ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'],
+};
+const FINGERS = [
+  ['AURICULAIRE GAUCHE', '#ff6b9a'], ['ANNULAIRE GAUCHE', '#ffb347'], ['MAJEUR GAUCHE', '#ffe97a'], ['INDEX GAUCHE', '#7affc0'],
+  ['INDEX DROIT', '#7ad9ff'], ['MAJEUR DROIT', '#ffe97a'], ['ANNULAIRE DROIT', '#ffb347'], ['AURICULAIRE DROIT', '#ff6b9a'],
+];
+const COL_FINGER = [0, 1, 2, 3, 3, 4, 4, 5, 6, 7]; // doigt de chaque colonne (dactylographie classique)
+let kbPref = loadJSON('typerider.kb', { show: null, layout: 'azerty' });
+let lastKey = null; // dernière touche tapée, pour l'éclairer brièvement
+
+// affiché par défaut dans les modes enfants, masquable avec F4
+function keyboardVisible() { return kbPref.show === null ? DIFFS[diffIndex].pool !== 'full' : kbPref.show; }
+
+function keyPos(ch) {
+  const rows = KB_LAYOUTS[kbPref.layout];
+  for (let r = 0; r < rows.length; r++) {
+    const c = rows[r].indexOf(ch);
+    if (c >= 0) return { r, c };
+  }
+  return null;
+}
+
+// ===================== MOTS SPÉCIAUX =====================
+let freezeT = 0;          // durée restante du gel
+let seenKinds = {};       // pour n'expliquer chaque mot spécial qu'une fois par partie
+
 function currentMPM() {
   if (playT < 2) return 0;
   const win = Math.min(10, playT);
@@ -1858,6 +1894,7 @@ function startGame() {
   queuedWord = null; previewWord = ''; previewTimer = 0; rewindFlash = 0;
   playT = 0; keyLog = []; peakMpm = 0;
   vehicleTier = 1; evo = null; rings = []; marks = [];
+  freezeT = 0; seenKinds = {}; lastKey = null;
   weather = 'clair'; drops = []; snowCover = 0; rainbowTarget = 0; lightning = 0;
   pendingBiome = -1; biomeFade = null;
   if (biomeIndex !== 0) setBiome(0, 0);
@@ -1912,8 +1949,21 @@ function spawnWord() {
     x = margin + Math.random() * Math.max(10, W - wpx - margin * 2);
   }
   const fallTime = waveFallTime(waveNum) * (0.88 + Math.random() * 0.28);
+  // mot spécial (à partir de la vague 2), un peu plus fréquent en modes enfants
+  let kind = null;
+  if (waveNum >= 2) {
+    const r = Math.random(), kids = DIFFS[diffIndex].pool !== 'full';
+    if (r < (kids ? 0.07 : 0.05)) kind = 'or';
+    else if (r < (kids ? 0.12 : 0.09)) kind = 'glace';
+    else if (r < (kids ? 0.14 : 0.12)) kind = 'bombe';
+  }
+  if (kind) x = Math.max(x, 40 + 7 * sc); // place pour l'icône à gauche du mot
+  if (kind && !seenKinds[kind]) {
+    seenKinds[kind] = true;
+    addPopup(W / 2, H * 0.22, WORD_KINDS[kind].hint, WORD_KINDS[kind].col, 2, 3);
+  }
   words.push({
-    text, x, y: -40, wpx,
+    text, x, y: -40, wpx, kind,
     speed: (groundY + 40) / fallTime,
     progress: 0,
     letters: text.split('').map(ch => ({ ch, gone: false })),
@@ -1921,6 +1971,50 @@ function spawnWord() {
     swayAmp: 3 + Math.random() * 5,
     dying: false, resetCount: 0, flash: 0,
   });
+}
+
+// effet d'un mot spécial terminé
+function specialEffect(w) {
+  const c = letterPos(w, (w.text.length - 1) / 2);
+  if (w.kind === 'or') {
+    const gain = 5 * w.text.length;
+    credits += gain;
+    saveMeta();
+    addPopup(c.x, w.y - 58, '+' + gain + ' CREDITS', '#ffd93b', 2);
+    spawnParticles(c.x, c.y, 24, '#ffd93b', 240, 0.7, true);
+    spawnStars(c.x, c.y, 6);
+    AudioSys.coin();
+  } else if (w.kind === 'glace') {
+    freezeT = 4;
+    addPopup(c.x, w.y - 58, 'GEL !', '#7ad9ff', 3);
+    addRing(c.x, c.y, 240, '#bfe9ff', 0.6);
+    spawnParticles(c.x, c.y, 24, '#e6f7ff', 220, 0.8);
+    AudioSys.freeze();
+  } else if (w.kind === 'bombe') {
+    const R = Math.max(150, Math.min(260, W * 0.25));
+    addRing(c.x, c.y, R, '#ff8c42', 0.5);
+    addRing(c.x, c.y, R * 0.7, '#ffd93b', 0.4);
+    spawnParticles(c.x, c.y, 40, '#ff8c42', 320, 0.7, true);
+    shake(8);
+    AudioSys.boom();
+    let n = 0;
+    for (const o of words) {
+      if (o === w || o.dying) continue;
+      const oc = letterPos(o, (o.text.length - 1) / 2);
+      if (Math.hypot(oc.x - c.x, oc.y - c.y) > R) continue;
+      o.dying = true;
+      for (const l of o.letters) l.gone = true;
+      spawnParticles(oc.x, oc.y, 26, '#ff8c42', 280, 0.6, true);
+      spawnShards(oc.x, oc.y, 6, '#f2f5ff');
+      score += 15 * o.text.length * multiplier();
+      combo++;
+      stats.wordsDone++;
+      stats.bestCombo = Math.max(stats.bestCombo, combo);
+      if (activeWord === o) activeWord = null;
+      n++;
+    }
+    if (n) addPopup(c.x, w.y - 58, 'BOUM ! X' + n, '#ff8c42', 3);
+  }
 }
 
 // position (centre) d'une lettre d'un mot, en px écran
@@ -2046,8 +2140,8 @@ function spawnStars(x, y, n) {
   }
 }
 
-function addPopup(x, y, text, color, scale) {
-  popups.push({ x, y, text, color, scale: scale || 3, life: 1.2, maxLife: 1.2 });
+function addPopup(x, y, text, color, scale, life) {
+  popups.push({ x, y, text, color, scale: scale || 3, life: life || 1.2, maxLife: life || 1.2 });
 }
 
 function shake(amp) { shakeT = 0.35; shakeAmp = Math.max(shakeAmp, amp); }
@@ -2114,8 +2208,20 @@ function maybeDrop(word) {
 window.addEventListener('keydown', (e) => {
   AudioSys.init();
 
-  // F2 coupe le son : jamais en conflit avec les lettres du jeu
+  // F2 coupe le son, F3 change de disposition, F4 affiche le clavier : jamais en conflit avec les lettres
   if (e.key === 'F2') { AudioSys.muted = !AudioSys.muted; return; }
+  if (e.key === 'F3') {
+    kbPref.layout = kbPref.layout === 'azerty' ? 'qwerty' : 'azerty';
+    saveJSON('typerider.kb', kbPref);
+    e.preventDefault();
+    return;
+  }
+  if (e.key === 'F4') {
+    kbPref.show = !keyboardVisible();
+    saveJSON('typerider.kb', kbPref);
+    e.preventDefault();
+    return;
+  }
 
   if (state === ST_SHOP) {
     if (e.key === 'ArrowUp') shopMove(-1);
@@ -2174,6 +2280,7 @@ function typeChar(ch) {
       if (w.text[0] === ch && (!cand || w.y > cand.y)) cand = w;
     }
     if (!cand) {
+      lastKey = { ch, ok: false, t: gameT };
       AudioSys.tone(200, 0.06, 'square', 0.03);
       return;
     }
@@ -2183,6 +2290,7 @@ function typeChar(ch) {
   const w = activeWord;
   const expected = w.text[w.progress];
   stats.typed++;
+  lastKey = { ch, ok: ch === expected, t: gameT };
 
   if (ch === expected) {
     w.letters[w.progress].gone = false; // le tir la fera disparaître
@@ -2208,6 +2316,7 @@ function typeChar(ch) {
       if (mult > 1) addPopup(p.x, w.y - 14 - 26, 'X' + mult, '#7affc0', 2);
       AudioSys.word(mult);
       maybeDrop(w);
+      if (w.kind) specialEffect(w);
     }
   } else {
     // erreur : on recommence le mot depuis le début
@@ -2387,11 +2496,18 @@ function update(dt) {
     }
   }
 
-  // chute des mots
+  // chute des mots (ralentie pendant le gel)
+  if (freezeT > 0) freezeT = Math.max(0, freezeT - dt);
+  const fallMul = freezeT > 0 ? 0.2 : 1;
   for (let i = words.length - 1; i >= 0; i--) {
     const w = words[i];
+    if (w.dying && w.letters.every(l => l.gone)) { words.splice(i, 1); continue; } // soufflé par une bombe
     if (w.flash > 0) w.flash -= dt;
-    if (!w.dying) w.y += w.speed * dt;
+    if (!w.dying) w.y += w.speed * dt * fallMul;
+    if (w.kind === 'or' && !w.dying && Math.random() < dt * 8) {
+      const p = letterPos(w, Math.random() * (w.text.length - 1));
+      particles.push({ x: p.x, y: p.y - 10, vx: 0, vy: -20, life: 0.5, maxLife: 0.5, color: '#fff3b0', size: 1, grav: 0, star: Math.random() < 0.3 });
+    }
     const wordBottom = w.y + 7 * wordScale();
     if (!w.dying && wordBottom >= groundY) {
       // impact au sol !
@@ -2602,6 +2718,22 @@ function drawEvolutionBanner() {
   ctx.globalAlpha = 1;
 }
 
+// mots spéciaux : icône 7x7, couleurs du cadre, message d'explication
+const WORD_KINDS = {
+  or: {
+    col: '#ffd93b', bg: 'rgba(90,64,8,0.75)', hint: 'MOT DORE : BONUS DE CREDITS !',
+    icon: ['...#...', '...#...', '#######', '.#####.', '..###..', '.##.##.', '##...##'],
+  },
+  glace: {
+    col: '#7ad9ff', bg: 'rgba(16,52,86,0.75)', hint: 'MOT GELE : IL RALENTIT TOUS LES MOTS',
+    icon: ['#..#..#', '.#.#.#.', '..###..', '#######', '..###..', '.#.#.#.', '#..#..#'],
+  },
+  bombe: {
+    col: '#ff6b6b', bg: 'rgba(86,16,24,0.75)', hint: 'MOT BOMBE : IL FAIT EXPLOSER SES VOISINS',
+    icon: ['.....#.', '....#..', '..###..', '.#####.', '.#####.', '.#####.', '..###..'],
+  },
+};
+
 function drawWords() {
   const sc = wordScale();
   for (const w of words) {
@@ -2611,15 +2743,29 @@ function drawWords() {
     const wpx = w.text.length * 6 * sc;
     const isActive = w === activeWord;
     const danger = !w.dying && w.y > groundY - H * 0.28;
+    const K = w.kind ? WORD_KINDS[w.kind] : null;
 
     // fond du mot
     if (!w.dying) {
-      ctx.fillStyle = w.flash > 0 ? 'rgba(180,30,50,0.75)' : 'rgba(8,12,28,0.62)';
+      ctx.fillStyle = w.flash > 0 ? 'rgba(180,30,50,0.75)' : (K ? K.bg : 'rgba(8,12,28,0.62)');
       ctx.fillRect(x - 2 * sc, y - 2 * sc, wpx + 3 * sc, 11 * sc);
+      if (freezeT > 0) {
+        ctx.fillStyle = 'rgba(191,233,255,0.22)';
+        ctx.fillRect(x - 2 * sc, y - 2 * sc, wpx + 3 * sc, 11 * sc);
+      }
+      if (K) {
+        const s = sc;
+        const ix = x - 2 * sc - 7 * s - 4, iy = y;
+        drawIcon(ctx, K.icon, ix, iy, s, K.col);
+        if (w.kind === 'bombe' && Math.sin(gameT * 20) > 0) {
+          ctx.fillStyle = '#ffd93b';
+          ctx.fillRect(ix + 6 * s, iy - s, s, s);
+        }
+      }
       // liseré
-      let border = null;
+      let border = K ? K.col : null;
       if (isActive) border = '#ffe97a';
-      else if (danger) border = (Math.sin(gameT * 10) > 0 ? '#ff6b6b' : null);
+      else if (danger) border = (Math.sin(gameT * 10) > 0 ? '#ff6b6b' : border);
       if (border) {
         ctx.fillStyle = border;
         ctx.fillRect(x - 2 * sc, y - 2 * sc, wpx + 3 * sc, sc);
@@ -2645,6 +2791,68 @@ function drawWords() {
       ctx.fillRect(x + w.progress * 6 * sc, y + 8 * sc, 5 * sc, sc);
     }
   }
+}
+
+// prochaine touche conseillée : lettre suivante du mot visé, sinon 1re lettre du mot le plus bas
+function nextKeyHint() {
+  if (activeWord && !activeWord.dying && words.includes(activeWord)) return activeWord.text[activeWord.progress];
+  let low = null;
+  for (const w of words) if (!w.dying && (!low || w.y > low.y)) low = w;
+  return low ? low.text[0] : null;
+}
+
+function drawKeyboard() {
+  if (!keyboardVisible() || (state !== ST_PLAY && state !== ST_BREAK && state !== ST_PAUSE)) return;
+  const rows = KB_LAYOUTS[kbPref.layout];
+  const k = Math.max(18, Math.min(26, Math.round(W / 36)));
+  const step = k + 3;
+  const x0 = 16, y0 = H - 74 - 3 * step;
+  const target = nextKeyHint();
+  const tp = target ? keyPos(target) : null;
+  ctx.fillStyle = 'rgba(8,12,28,0.55)';
+  ctx.fillRect(x0 - 8, y0 - 8, Math.round(10.8 * step) + 13, 3 * step + 32);
+  rows.forEach((row, r) => {
+    const ox = x0 + [0, 0.3, 0.8][r] * step;
+    for (let c = 0; c < row.length; c++) {
+      const ch = row[c];
+      const fcol = FINGERS[COL_FINGER[c]][1];
+      const x = Math.round(ox + c * step), y = y0 + r * step;
+      const isT = tp && tp.r === r && tp.c === c;
+      ctx.fillStyle = hexToRgba(fcol, isT ? 0.95 : 0.42);
+      ctx.fillRect(x, y, k, k);
+      if (lastKey && lastKey.ch === ch && gameT - lastKey.t < 0.18) {
+        ctx.fillStyle = lastKey.ok ? 'rgba(122,255,192,0.9)' : 'rgba(255,107,107,0.9)';
+        ctx.fillRect(x, y, k, k);
+      }
+      if (isT && Math.sin(gameT * 10) > -0.3) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(x - 2, y - 2, k + 4, 2);
+        ctx.fillRect(x - 2, y + k, k + 4, 2);
+        ctx.fillRect(x - 2, y, 2, k);
+        ctx.fillRect(x + k, y, 2, k);
+      }
+      drawPixelText(ctx, ch, x + Math.round((k - 10) / 2), y + Math.round((k - 14) / 2), 2, isT ? '#101528' : '#f2f5ff');
+      if (r === 1 && (c === 3 || c === 6)) { // repères tactiles des index (F et J)
+        ctx.fillStyle = isT ? '#101528' : '#f2f5ff';
+        ctx.fillRect(x + (k >> 1) - 3, y + k - 4, 6, 2);
+      }
+    }
+  });
+  const label = tp ? 'DOIGT : ' + FINGERS[COL_FINGER[tp.c]][0] : 'CLAVIER ' + kbPref.layout.toUpperCase();
+  drawPixelTextOutline(ctx, label, x0, y0 + 3 * step + 4, 2, tp ? FINGERS[COL_FINGER[tp.c]][1] : '#9fb3e8', '#101528');
+}
+
+// liseré de givre sur les bords de l'écran pendant le gel
+function drawFreeze() {
+  if (freezeT <= 0) return;
+  const a = Math.min(1, freezeT) * 0.5;
+  const t = Math.max(6, Math.round(PX * 3));
+  ctx.fillStyle = 'rgba(191,233,255,' + a + ')';
+  ctx.fillRect(0, 0, W, t);
+  ctx.fillRect(0, H - t, W, t);
+  ctx.fillRect(0, 0, t, H);
+  ctx.fillRect(W - t, 0, t, H);
+  drawPixelTextOutline(ctx, 'GEL ' + freezeT.toFixed(1), W / 2, 60, 2, '#bfe9ff', '#101528', 'center');
 }
 
 // apparence de chaque projectile : [cœur, couleur, traînée, taille relative]
@@ -2860,14 +3068,16 @@ function draw(dt) {
   }
 
   drawMarks();
-  if (state !== ST_OVER) drawWords();
-  drawBullets();
   drawVehicle();
   drawForeground();
+  drawKeyboard();
+  if (state !== ST_OVER) drawWords();
+  drawBullets();
   drawParticles();
   drawRings();
   drawPopups();
   drawHUD();
+  drawFreeze();
   drawEvolutionBanner();
 
   if (errorFlash > 0) {
@@ -3124,7 +3334,8 @@ function drawTitle() {
   ry += 40;
   drawPixelTextOutline(ctx, 'FLECHES : DIFFICULTE   B : BOUTIQUE   G : GARAGE', W / 2, ry, 2, '#9fb3e8', '#101528', 'center');
   ry += 22;
-  drawPixelTextOutline(ctx, 'ECHAP : PAUSE   F2 : SON', W / 2, ry, 2, '#9fb3e8', '#101528', 'center');
+  drawPixelTextOutline(ctx, 'ECHAP : PAUSE   F2 : SON   F4 : CLAVIER   F3 : ' + (kbPref.layout === 'azerty' ? 'AZERTY' : 'QWERTY'),
+    W / 2, ry, 2, '#9fb3e8', '#101528', 'center');
   ry += 24;
   const meta = [];
   if (best > 0) meta.push('MEILLEUR (' + DIFFS[diffIndex].name + ') ' + best);
@@ -3165,6 +3376,8 @@ window.__TR = {
   giveCredits(n) { credits += n; saveMeta(); },
   setTier(n) { vehicleTier = n; garageMax = Math.max(garageMax, n); },
   setBiome(i, tod) { setBiome(i, tod || 0); },
+  spawn(kind, y) { spawnWord(); const w = words[words.length - 1]; w.kind = kind || null; if (y) w.y = y; return w.text; },
+  get freeze() { return freezeT; },
   setWeather(w) { weather = w; if (w === 'orage') nextBolt = 0.2; },
   get biome() { return BIOMES[biomeIndex].id; },
   get layers() {
