@@ -122,6 +122,22 @@ aperçu animé du véhicule. Les crédits, achats et équipements sont **sauvega
 Navigation : ←/→ pour changer d'onglet, ↑/↓ pour choisir, Entrée pour
 acheter / équiper / activer, Échap pour sortir.
 
+## Studio VFX
+
+Un post-traitement WebGL (fichier `vfx.js`, sans aucune dépendance) ajoute par-dessus
+le pixel art des effets de type cinéma. Les mots et l'interface restent nets, sur
+une couche à part. Chaque effet s'active ou se coupe dans l'onglet **VFX** de la
+boutique, et **F8** coupe ou rallume tout d'un coup pour comparer.
+
+| Famille | Effets |
+|---|---|
+| Lumière | lueur cinéma (soleil, néons, lave, lasers, explosions), rayons de lumière volumétriques, reflets d'objectif (halo, fantômes, traînée anamorphique), éclairage dynamique (explosions, tirs, phares la nuit) |
+| Impacts | ondes de choc qui déforment l'image, aberration chromatique sur les gros impacts et les fautes |
+| Atmosphère | brume de chaleur (volcan, canyon, tempête de sable), gouttes sur l'objectif sous la pluie |
+| Caméra | étalonnage cinéma (couleurs, contraste, vignette), grain de pellicule |
+
+Si le navigateur ne gère pas WebGL, le jeu s'affiche simplement sans VFX.
+
 ## Mots spéciaux
 
 À partir de la vague 2, certains mots ont un cadre et une icône (un peu plus fréquents en modes enfants) :
@@ -157,10 +173,12 @@ Affiché par défaut en modes Poussin et Enfant ; **F4** l'affiche ou le masque,
 | F2 | couper le son |
 | F3 | clavier AZERTY / QWERTY |
 | F4 | afficher / masquer le clavier à l'écran |
+| F8 | activer / couper tous les VFX |
 
 ## Fichiers
 
 - `index.html` — page du jeu
 - `style.css` — plein écran, rendu pixelisé
+- `vfx.js` — post-traitement WebGL (lueur, rayons, reflets, lumières, ondes de choc, chaleur, gouttes, étalonnage, grain)
 - `vehicles.js` — les 9 véhicules en pixel art procédural (roues, jambes, armes, accessoires, contour automatique)
 - `game.js` — moteur du jeu (décor en parallax, effets, audio synthé rétro, boutique, logique de jeu)

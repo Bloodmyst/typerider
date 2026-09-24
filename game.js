@@ -8,8 +8,15 @@
 
 // ===================== CANVAS & DIMENSIONS =====================
 const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
+const sceneCtx = canvas.getContext('2d');
+// interface (mots, HUD, menus) : dessinée sur une couche nette, jamais déformée par les VFX
+const uiCanvas = document.getElementById('ui');
+const uictx = uiCanvas.getContext('2d');
+let ctx = sceneCtx; // contexte courant : la scène ou l'interface
 const V = window.TRVehicles;
+const VFX = window.TRVfx;
+const vfxCanvas = document.getElementById('vfx');
+const vfxSupported = VFX.init(vfxCanvas);
 
 let W = 0, H = 0;        // taille plein écran (px réels)
 let PX = 3;              // taille d'un "gros pixel" du décor
@@ -27,6 +34,10 @@ function resize() {
   H = window.innerHeight;
   canvas.width = W;
   canvas.height = H;
+  uiCanvas.width = W;
+  uiCanvas.height = H;
+  uictx.imageSmoothingEnabled = false;
+  VFX.resize(W, H);
   PX = Math.max(2, Math.round(Math.min(W, H) / 260));
   bw = Math.ceil(W / PX);
   bh = Math.ceil(H / PX);
@@ -35,7 +46,7 @@ function resize() {
   fg.width = bw;
   fg.height = bh;
   groundY = H - GROUND_LR * PX;
-  ctx.imageSmoothingEnabled = false;
+  sceneCtx.imageSmoothingEnabled = false;
   bctx.imageSmoothingEnabled = false;
   fctx.imageSmoothingEnabled = false;
   buildBackground();
@@ -1203,6 +1214,8 @@ function weatherParticles(dt, horizon) {
       let bx = bw * (0.15 + Math.random() * 0.7), by = 0;
       while (by < horizon * 0.6) { bolt.push([bx, by]); bx += (Math.random() - 0.5) * 12; by += 5 + Math.random() * 7; }
       setTimeout(() => AudioSys.thunder(), 200 + Math.random() * 500);
+      addLight(bx * PX, H * 0.3, H * 0.8, 0.9, '#cfe0ff', 0.35);
+      vfxPulse += 0.5;
     }
   }
   if (lightning > 0) {
@@ -1414,7 +1427,7 @@ function drawBackground(dt) {
     }
     if (li === 2) drawFog(horizon - bh * 0.38, bh * 0.3);
   });
-  if (biome.godrays) drawGodRays();
+  if (biome.godrays && !(vfxActive() && vfxPrefs.rays)) drawGodRays(); // les rayons VFX prennent le relais
   if (biome.cityGlow && pal.starA > 0.1) {
     const gh = bh * 0.4;
     const cg = bctx.createLinearGradient(0, horizon - gh, 0, horizon);
@@ -1680,8 +1693,10 @@ const SHOP_TABS = [
   { id: 'skin', name: 'COULEURS' },
   { id: 'acc', name: 'ACCESSOIRES' },
   { id: 'fx', name: 'EFFETS' },
+  { id: 'vfx', name: 'VFX' },
   { id: 'garage', name: 'GARAGE' },
 ];
+const tabIndex = (id) => SHOP_TABS.findIndex(t => t.id === id);
 
 const SHOP_ITEMS = [
   { id: 'skin_bleu', type: 'skin', name: 'BLEU CLASSIQUE', price: 0 },
@@ -1713,6 +1728,7 @@ let previewShotT = 0, previewAnchor = null;
 function shopRows() {
   const tab = SHOP_TABS[shopTab].id;
   if (tab === 'garage') return V.list.map((v, i) => ({ garage: true, i, v }));
+  if (tab === 'vfx') return VFX_ITEMS.map(v => ({ vfx: true, key: v.key, sub: v.sub, name: v.name }));
   return SHOP_ITEMS.filter(it => it.type === tab);
 }
 
@@ -1742,6 +1758,14 @@ function shopAction() {
   const it = shopRows()[shopIndex];
   if (!it || it.garage) return;
   const click = () => AudioSys.tone(700, 0.08, 'square', 0.05);
+  if (it.vfx) {
+    // les VFX sont des réglages d'image : gratuits, on les active ou coupe librement
+    if (!vfxSupported) { AudioSys.error(); return; }
+    vfxPrefs[it.key] = !vfxPrefs[it.key];
+    saveJSON('typerider.vfx', vfxPrefs);
+    click();
+    return;
+  }
   if (!owned.includes(it.id)) {
     if (credits < it.price) { AudioSys.error(); return; }
     credits -= it.price;
@@ -1873,8 +1897,84 @@ let rings = [];               // ondes de choc
 let hitStop = 0;              // micro-pause à la destruction d'un mot
 let camX = 0, camY = 0;       // recul de caméra orienté
 
-function addRing(x, y, maxR, col, dur) { rings.push({ x, y, maxR, col, t: 0, dur: dur || 0.45 }); }
+function addRing(x, y, maxR, col, dur) {
+  rings.push({ x, y, maxR, col, t: 0, dur: dur || 0.45 });
+  // chaque onde visible déforme aussi l'image et éclaire la scène (VFX)
+  addShock(x, y, maxR * 1.1, Math.min(1, maxR / 110), (dur || 0.45) * 1.3);
+  addLight(x, y, maxR * 1.4, Math.min(1.2, maxR / 90), col, dur || 0.45);
+}
 function camKick(dx, dy, amt) { camX += dx * amt; camY += dy * amt; }
+
+// ===================== STUDIO VFX (post-traitement WebGL) =====================
+const VFX_ITEMS = [
+  { key: 'master', sub: 'GENERAL', name: 'TOUS LES VFX (F8)' },
+  { key: 'bloom', sub: 'LUMIERE', name: 'LUEUR CINEMA' },
+  { key: 'rays', sub: 'LUMIERE', name: 'RAYONS DE LUMIERE' },
+  { key: 'flare', sub: 'LUMIERE', name: 'REFLETS D\'OBJECTIF' },
+  { key: 'light', sub: 'LUMIERE', name: 'ECLAIRAGE DYNAMIQUE' },
+  { key: 'shock', sub: 'IMPACTS', name: 'ONDES DE CHOC' },
+  { key: 'chroma', sub: 'IMPACTS', name: 'ABERRATION CHROMATIQUE' },
+  { key: 'heat', sub: 'ATMOSPHERE', name: 'BRUME DE CHALEUR' },
+  { key: 'drops', sub: 'ATMOSPHERE', name: 'GOUTTES SUR L\'OBJECTIF' },
+  { key: 'grade', sub: 'CAMERA', name: 'ETALONNAGE CINEMA' },
+  { key: 'grain', sub: 'CAMERA', name: 'GRAIN DE PELLICULE' },
+];
+let vfxPrefs = Object.assign(
+  Object.fromEntries(VFX_ITEMS.map(v => [v.key, true])),
+  loadJSON('typerider.vfx', {}));
+let shocks = [], lights = [], vfxPulse = 0, vfxShown = null;
+
+function vfxActive() { return vfxSupported && vfxPrefs.master; }
+
+function addShock(x, y, maxR, str, dur) {
+  shocks.push({ x, y, maxR, str, t: 0, dur });
+  if (shocks.length > 8) shocks.shift();
+}
+
+function addLight(x, y, r, i, col, dur) {
+  const c = Array.isArray(col) ? col : hexToRgb(col).map(v => v / 255);
+  lights.push({ x, y, r, i, col: c, t: 0, dur: dur || 0.3 });
+  if (lights.length > 7) lights.shift();
+}
+
+function vfxParams() {
+  const day = 1 - pal.starA;
+  const biome = BIOMES[biomeIndex];
+  const heat = biome.id === 'volcan' ? 1 : biome.id === 'canyon' ? 0.7 * day : 0;
+  const L = lights.map(l => {
+    const k = 1 - l.t / l.dur;
+    return { x: l.x, y: l.y, r: l.r, i: l.i * k * k, col: l.col };
+  });
+  // la nuit, les phares éclairent la route devant le véhicule
+  if (vehMeta && vehMeta.headlight && pal.starA > 0.3 && state !== ST_SHOP) {
+    L.push({ x: vehMeta.x + (vehMeta.headlight[0] + 30) * vehMeta.u, y: groundY - 4, r: 150, i: 0.55 * pal.starA, col: [1, 0.92, 0.7] });
+  }
+  return {
+    time: gameT,
+    on: vfxPrefs,
+    sun: [sunX, sunY, (day + pal.starA * 0.3) * (1 - rainAmt * 0.85)],
+    shocks: shocks.map(s => {
+      const k = s.t / s.dur;
+      return { x: s.x, y: s.y, r: s.maxR * (1 - (1 - k) * (1 - k)), s: s.str * (1 - k) };
+    }),
+    lights: L,
+    heat: Math.max(heat, dustAmt * 0.6),
+    rain: rainAmt,
+    pulse: Math.min(1, vfxPulse),
+    thr: 0.92 - 0.32 * pal.starA,
+  };
+}
+
+// affiche l'image post-traitée (ou la scène brute si les VFX sont coupés)
+function present() {
+  const active = vfxActive();
+  if (active !== vfxShown) {
+    vfxShown = active;
+    vfxCanvas.style.display = active ? 'block' : 'none';
+    canvas.style.visibility = active ? 'hidden' : 'visible';
+  }
+  if (active) VFX.render(canvas, vfxParams());
+}
 
 function multiplier() {
   if (combo >= 40) return 8;
@@ -2006,6 +2106,7 @@ function specialEffect(w) {
     addRing(c.x, c.y, R * 0.7, '#ffd93b', 0.4);
     spawnParticles(c.x, c.y, 40, '#ff8c42', 320, 0.7, true);
     shake(8);
+    vfxPulse += 1;
     AudioSys.boom();
     let n = 0;
     for (const o of words) {
@@ -2058,6 +2159,7 @@ function shootFrom(anchorX, anchorY, u, meta, tier, tx, ty, word, index) {
     style: def.proj, col: BALL_COLORS[Math.floor(Math.random() * BALL_COLORS.length)],
   });
   spawnParticles(mx, my, 3, '#ffe97a', 120, 0.15);
+  addLight(mx, my, 50 + def.kick * 20, 0.5, '#ffe29a', 0.1); // éclair de bouche
   return { ux, uy, kick: def.kick };
 }
 
@@ -2123,6 +2225,9 @@ function impactFx(x, y, style, onLetter) {
   }
   if (onLetter) spawnShards(x, y, 4, '#f2f5ff');
   if (fxActive('fx_etoiles')) spawnStars(x, y, 3);
+  const glow = { eau: '#7ad9ff', laser: '#ff5d8f', laser2: '#7ad9ff', plasma: '#7affc0' }[style] || '#ffb347';
+  addLight(x, y, 80, 0.6, glow, 0.22);
+  if (style === 'obus') vfxPulse += 0.6;
 }
 
 function spawnParticles(x, y, n, color, speed, life, gravity) {
@@ -2232,6 +2337,14 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
     return;
   }
+  if (e.key === 'F8') {
+    // compare en un geste le pixel art brut et sa version VFX
+    vfxPrefs.master = !vfxPrefs.master;
+    saveJSON('typerider.vfx', vfxPrefs);
+    addPopup(W / 2, H * 0.3, vfxSupported ? (vfxPrefs.master ? 'VFX ACTIVES' : 'VFX COUPES') : 'VFX INDISPONIBLES (WEBGL)', '#7ad9ff', 3);
+    e.preventDefault();
+    return;
+  }
 
   if (state === ST_SHOP) {
     if (e.key === 'ArrowUp') shopMove(-1);
@@ -2247,7 +2360,7 @@ window.addEventListener('keydown', (e) => {
   if (state === ST_TITLE || state === ST_OVER) {
     if (e.key === 'Enter') { startGame(); }
     else if (e.key === 'b' || e.key === 'B') { lastGain = 0; openShop('title', 0); }
-    else if (e.key === 'g' || e.key === 'G') { lastGain = 0; openShop('title', 3); }
+    else if (e.key === 'g' || e.key === 'G') { lastGain = 0; openShop('title', tabIndex('garage')); }
     else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
       const dir = e.key === 'ArrowLeft' ? -1 : 1;
       diffIndex = (diffIndex + dir + DIFFS.length) % DIFFS.length;
@@ -2337,6 +2450,7 @@ function typeChar(ch) {
     w.flash = 0.5;
     combo = 0;
     errorFlash = 0.25;
+    vfxPulse += 0.35; // petit « glitch » d'aberration sur les fautes
     activeWord = null; // il faudra re-cibler avec la 1re lettre
     AudioSys.error();
   }
@@ -2385,6 +2499,7 @@ function update(dt) {
       addRing(turret.x, cy, 160, '#ffffff', 0.6);
       addRing(turret.x, cy, 100, '#ffe97a', 0.45);
       shake(6);
+      vfxPulse += 1;
       AudioSys.word(8);
       if (pendingBiome >= 0) {
         setBiome(pendingBiome, (waveNum - 1) % 4);
@@ -2434,6 +2549,13 @@ function update(dt) {
     rings[i].t += dt;
     if (rings[i].t >= rings[i].dur) rings.splice(i, 1);
   }
+  for (const list of [shocks, lights]) {
+    for (let i = list.length - 1; i >= 0; i--) {
+      list[i].t += dt;
+      if (list[i].t >= list[i].dur) list.splice(i, 1);
+    }
+  }
+  vfxPulse *= Math.exp(-dt * 4);
   // popups
   for (let i = popups.length - 1; i >= 0; i--) {
     const p = popups[i];
@@ -2482,6 +2604,7 @@ function update(dt) {
           camKick(b.vx / d, b.vy / d, 5);
           shake(3);
           hitStop = 0.06;
+          vfxPulse += 0.25;
         }
       } else {
         spawnParticles(b.x, b.y, 4, '#9aa7c7', 120, 0.2);
@@ -2529,6 +2652,9 @@ function update(dt) {
       combo = 0;
       lives--;
       shake(9);
+      addShock(p.x, groundY, 200, 1, 0.6);
+      addLight(p.x, groundY, 170, 1.1, '#ff6b6b', 0.45);
+      vfxPulse += 1;
       errorFlash = 0.35;
       AudioSys.boom();
       if (lives <= 0) {
@@ -3050,41 +3176,50 @@ function drawCenteredPanel(lines) {
 }
 
 function draw(dt) {
-  ctx.save();
   let ox = camX, oy = camY;
   if (shakeAmp > 0) {
     ox += (Math.random() - 0.5) * shakeAmp * 2;
     oy += (Math.random() - 0.5) * shakeAmp * 2;
   }
-  ctx.translate(Math.round(ox), Math.round(oy));
-
+  uictx.setTransform(1, 0, 0, 1, 0, 0);
+  uictx.clearRect(0, 0, W, H);
+  for (const c of [sceneCtx, uictx]) {
+    c.save();
+    c.translate(Math.round(ox), Math.round(oy));
+  }
+  ctx = sceneCtx;
   drawBackground(state === ST_PAUSE ? 0 : dt);
-
   if (state === ST_SHOP) {
     drawForeground();
     drawShop(dt);
-    ctx.restore();
-    return;
-  }
-
-  if (state === ST_TITLE) {
+  } else if (state === ST_TITLE) {
     drawMarks();
     drawVehicle();
     drawForeground();
     drawParticles();
+    drawRings();
+    ctx = uictx;
     drawTitle();
-    ctx.restore();
-    return;
+    drawPopups();
+  } else {
+    drawPlay();
   }
+  sceneCtx.restore();
+  uictx.restore();
+  ctx = sceneCtx;
+}
 
+// partie en cours : décor et effets sur la scène, mots et interface sur la couche nette
+function drawPlay() {
   drawMarks();
   drawVehicle();
   drawForeground();
-  drawKeyboard();
-  if (state !== ST_OVER) drawWords();
   drawBullets();
   drawParticles();
   drawRings();
+  ctx = uictx;
+  drawKeyboard();
+  if (state !== ST_OVER) drawWords();
   drawPopups();
   drawHUD();
   drawFreeze();
@@ -3139,14 +3274,17 @@ function draw(dt) {
       { text: 'ECHAP : MENU (CHANGER DE DIFFICULTE)', scale: 2, color: '#9fb3e8', gap: 0 },
     ]);
   }
-
-  ctx.restore();
 }
 
 // ===================== BOUTIQUE (rendu) =====================
 function shopRowStatus(it) {
   if (it.garage) {
     return it.i < garageMax ? [it.v.weapon, '#9fb3e8'] : ['NIVEAU ' + (it.i + 1), '#ff6b6b'];
+  }
+  if (it.vfx) {
+    if (!vfxSupported) return ['INDISPONIBLE', '#ff6b6b'];
+    if (it.key !== 'master' && !vfxPrefs.master) return [vfxPrefs[it.key] ? 'EN VEILLE' : 'INACTIF', '#9fb3e8'];
+    return vfxPrefs[it.key] ? ['ACTIF', '#7affc0'] : ['INACTIF', '#9fb3e8'];
   }
   if (!owned.includes(it.id)) return [it.price + ' CR', credits >= it.price ? '#ffd93b' : '#ff6b6b'];
   if (it.type === 'skin') return equipped.skin === it.id ? ['EQUIPE', '#7affc0'] : ['ACHETE', '#9fb3e8'];
@@ -3158,6 +3296,7 @@ function shopRowStatus(it) {
 function drawShopPreview(x, y, w, h, dt) {
   const tier = garageSel + 1;
   const locked = tier > garageMax;
+  ctx = sceneCtx; // l'aperçu passe par les VFX, ses légendes restent nettes
   ctx.fillStyle = 'rgba(122,217,255,0.06)';
   ctx.fillRect(x, y, w, h);
   ctx.fillStyle = 'rgba(159,179,232,0.35)';
@@ -3198,6 +3337,7 @@ function drawShopPreview(x, y, w, h, dt) {
   drawRings();
   ctx.restore();
 
+  ctx = uictx;
   const def = V.list[tier - 1];
   drawPixelTextOutline(ctx, locked ? 'VEHICULE VERROUILLE' : def.name, x + w / 2, y + h + 12, 3,
     locked ? '#ff6b6b' : '#7affc0', '#101528', 'center');
@@ -3206,8 +3346,11 @@ function drawShopPreview(x, y, w, h, dt) {
 }
 
 function drawShop(dt) {
-  ctx.fillStyle = 'rgba(6,9,22,0.85)';
-  ctx.fillRect(0, 0, W, H);
+  // fond assombri sur la scène (plus léger dans l'onglet VFX pour voir les effets derrière)
+  ctx = sceneCtx;
+  ctx.fillStyle = SHOP_TABS[shopTab].id === 'vfx' ? 'rgba(6,9,22,0.55)' : 'rgba(6,9,22,0.85)';
+  ctx.fillRect(-20, -20, W + 40, H + 40);
+  ctx = uictx;
 
   let y = Math.max(16, Math.round(H * 0.04));
   drawPixelTextOutline(ctx, 'BOUTIQUE', W / 2, y, 5, '#ffd93b', '#101528', 'center');
@@ -3284,7 +3427,7 @@ function drawShop(dt) {
 
   const tab = SHOP_TABS[shopTab].id;
   const hint = tab === 'garage' ? 'HAUT/BAS : VOIR UN VEHICULE'
-    : 'ENTREE : ' + (tab === 'fx' ? 'ACHETER / ACTIVER' : 'ACHETER / EQUIPER');
+    : 'ENTREE : ' + (tab === 'vfx' ? 'ACTIVER / COUPER' : tab === 'fx' ? 'ACHETER / ACTIVER' : 'ACHETER / EQUIPER');
   drawPixelTextOutline(ctx, 'GAUCHE/DROITE : ONGLET   ' + hint, W / 2, H - 54, 2, '#dfe6ff', '#101528', 'center');
   drawPixelTextOutline(ctx, 'ECHAP : ' + (shopReturn === 'game' ? 'CONTINUER LA PARTIE' : 'RETOUR AU TITRE'),
     W / 2, H - 32, 2, '#7ad9ff', '#101528', 'center');
@@ -3304,7 +3447,7 @@ function drawTitle() {
   const bob = Math.round(Math.sin(gameT * 1.5) * 4);
   const hints = [
     'FLECHES : DIFFICULTE   B : BOUTIQUE   G : GARAGE',
-    'ECHAP : PAUSE   F2 : SON   F4 : CLAVIER   F3 : ' + (kbPref.layout === 'azerty' ? 'AZERTY' : 'QWERTY'),
+    'ECHAP : PAUSE   F2 : SON   F3/F4 : CLAVIER   F8 : VFX',
   ];
   const meta = (best > 0 ? 'MEILLEUR (' + d.name + ') ' + best + '   ' : '') + 'CREDITS ' + credits;
   // lettres aérées quand la ligne tient dans l'écran, serrées sinon
@@ -3406,6 +3549,7 @@ function frame(t) {
   if (hitStop > 0) { hitStop -= dt; dt *= 0.08; }
   if (state !== ST_PAUSE) update(dt);
   draw(dt);
+  present();
   requestAnimationFrame(frame);
 }
 
@@ -3433,6 +3577,8 @@ window.__TR = {
   setBiome(i, tod) { setBiome(i, tod || 0); },
   spawn(kind, y) { spawnWord(); const w = words[words.length - 1]; w.kind = kind || null; if (y) w.y = y; return w.text; },
   get freeze() { return freezeT; },
+  get vfx() { return { supported: vfxSupported, active: vfxActive(), prefs: Object.assign({}, vfxPrefs) }; },
+  setVfx(key, v) { vfxPrefs[key] = v; },
   setWeather(w) { weather = w; if (w === 'orage') nextBolt = 0.2; },
   get biome() { return BIOMES[biomeIndex].id; },
   get layers() {
@@ -3443,6 +3589,7 @@ window.__TR = {
   step(sec) {
     const dt = 1 / 60;
     for (let i = 0; i < sec * 60; i++) { if (state !== ST_PAUSE) update(dt); draw(dt); }
+    present();
   },
   shop(tab) { openShop('title', tab || 0); },
   useRewind, useBoomerang,
