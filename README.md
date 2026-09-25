@@ -18,6 +18,36 @@ Le jeu est 100 % HTML5, sans dépendance ni installation :
 
   puis ouvrez <http://localhost:8123>.
 
+### Application de bureau (Windows et Mac)
+
+Le jeu existe aussi en application autonome, qui s'ouvre dans sa propre fenêtre
+(**F11** ou **Alt+Entrée** pour le plein écran). Les fichiers sont dans la page
+**Releases** du dépôt :
+
+| Système | Fichier |
+|---|---|
+| Windows | `TypeRider-x.y.z-installateur.exe` (installe le jeu avec un raccourci) ou `TypeRider-x.y.z-portable.exe` (se lance directement) |
+| Mac à puce Apple (M1 et suivants) | `TypeRider-x.y.z-mac-arm64.dmg` |
+| Mac Intel | `TypeRider-x.y.z-mac-x64.dmg` |
+
+L'application n'est pas signée par un certificat payant :
+- **Windows** affiche « Windows a protégé votre ordinateur » : *Informations complémentaires* → *Exécuter quand même*.
+- **Mac** : clic droit sur l'app → *Ouvrir*, ou *Réglages Système → Confidentialité et sécurité → Ouvrir quand même*.
+
+Pour les développeurs :
+
+```
+npm install          # installe Electron et electron-builder
+npm start            # lance le jeu dans une fenêtre Electron
+npm run dist:win     # construit les .exe dans dist/ (sous Windows)
+npm run dist:mac     # construit les .dmg dans dist/ (sous Mac)
+npm run icon         # régénère build/icon.png depuis le dessin de l'icône
+```
+
+Chaque tag de version poussé sur GitHub (`git tag v1.8.0` puis `git push origin v1.8.0`)
+lance l'automatisation `.github/workflows/desktop.yml` : elle construit les versions
+Windows et Mac sur les serveurs de GitHub et les publie dans une Release.
+
 ### Mise en ligne
 
 Le jeu est un site statique : il se publie tel quel, sans étape de construction.
@@ -193,6 +223,8 @@ Les touches chiffrées marchent sur tous les claviers (AZERTY, QWERTY, Mac) sans
 
 - `index.html` — page du jeu
 - `style.css` — plein écran, rendu pixelisé
+- `electron/main.js` — fenêtre de l'application de bureau ; `package.json` — configuration de construction
+- `tools/make-icon.js` — génère l'icône de l'application
 - `vfx.js` — post-traitement WebGL (lueur, rayons, reflets, lumières, ondes de choc, chaleur, gouttes, étalonnage, grain)
 - `vehicles.js` — les 9 véhicules en pixel art procédural (roues, jambes, armes, accessoires, contour automatique)
 - `game.js` — moteur du jeu (décor en parallax, effets, audio synthé rétro, boutique, logique de jeu)

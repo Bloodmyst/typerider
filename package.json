@@ -1,0 +1,87 @@
+{
+  "name": "typerider",
+  "productName": "TypeRider",
+  "version": "1.7.0",
+  "description": "Jeu de dactylographie en pixel art : un voyage de l'écriture.",
+  "author": "Agneindeley Bile",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "electron/main.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Bloodmyst/typerider.git"
+  },
+  "scripts": {
+    "start": "electron .",
+    "icon": "node tools/make-icon.js",
+    "dist:win": "electron-builder --win --publish never",
+    "dist:mac": "electron-builder --mac --publish never"
+  },
+  "devDependencies": {
+    "electron": "39.8.10",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "com.bloodmyst.typerider",
+    "productName": "TypeRider",
+    "copyright": "TypeRider",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "index.html",
+      "style.css",
+      "game.js",
+      "vehicles.js",
+      "vfx.js",
+      "favicon.svg",
+      "build/icon.png",
+      "electron/**"
+    ],
+    "win": {
+      "icon": "build/icon.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "TypeRider",
+      "artifactName": "TypeRider-${version}-installateur.${ext}"
+    },
+    "portable": {
+      "artifactName": "TypeRider-${version}-portable.${ext}"
+    },
+    "mac": {
+      "icon": "build/icon.png",
+      "category": "public.app-category.games",
+      "identity": "-",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "artifactName": "TypeRider-${version}-mac-${arch}.${ext}"
+    },
+    "publish": null
+  }
+}
