@@ -1,0 +1,16 @@
+{
+  "name": "TypeRider — Un voyage de l'écriture",
+  "short_name": "TypeRider",
+  "description": "Jeu de dactylographie en pixel art : tapez les mots avant qu'ils touchent le sol.",
+  "lang": "fr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#0a0e2a",
+  "theme_color": "#0a0e2a",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "build/icon.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

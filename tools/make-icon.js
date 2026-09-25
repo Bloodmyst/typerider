@@ -1,10 +1,11 @@
-// Génère build/icon.png (512 x 512) : même dessin que favicon.svg, agrandi en pixels nets.
+// Génère build/icon.png (512 x 512) et les icônes web (icons/icon-180.png pour l'iPhone, icons/icon-192.png) :
+// même dessin que favicon.svg, agrandi en pixels nets.
 // Encodeur PNG minimal, sans dépendance : node tools/make-icon.js
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 
-const GRID = 16, SIZE = 512, S = SIZE / GRID;
+const GRID = 16;
 const rects = [
   [0, 0, 16, 16, '#0a0e2a'],
   [0, 12, 16, 4, '#5ad24f'],
@@ -15,15 +16,19 @@ const rects = [
   [13, 1, 1, 3, '#ff5d8f'], [12, 2, 3, 1, '#ff5d8f'],                     // étincelle
 ];
 
-const px = Buffer.alloc(SIZE * SIZE * 4);
-for (const [x, y, w, h, hex] of rects) {
-  const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
-  for (let yy = y * S; yy < (y + h) * S; yy++) {
-    for (let xx = x * S; xx < (x + w) * S; xx++) {
-      const o = (yy * SIZE + xx) * 4;
-      px[o] = c[0]; px[o + 1] = c[1]; px[o + 2] = c[2]; px[o + 3] = 255;
+// dessin à une taille quelconque : chaque pixel prend la couleur de sa case de la grille 16 x 16
+function render(SIZE) {
+  const px = Buffer.alloc(SIZE * SIZE * 4);
+  for (const [x, y, w, h, hex] of rects) {
+    const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+    for (let yy = Math.round(y * SIZE / GRID); yy < Math.round((y + h) * SIZE / GRID); yy++) {
+      for (let xx = Math.round(x * SIZE / GRID); xx < Math.round((x + w) * SIZE / GRID); xx++) {
+        const o = (yy * SIZE + xx) * 4;
+        px[o] = c[0]; px[o + 1] = c[1]; px[o + 2] = c[2]; px[o + 3] = 255;
+      }
     }
   }
+  return px;
 }
 
 const crcTable = Array.from({ length: 256 }, (_, n) => {
@@ -45,21 +50,28 @@ function chunk(type, data) {
   return Buffer.concat([len, body, crc]);
 }
 
-const ihdr = Buffer.alloc(13);
-ihdr.writeUInt32BE(SIZE, 0);
-ihdr.writeUInt32BE(SIZE, 4);
-ihdr[8] = 8;  // 8 bits par canal
-ihdr[9] = 6;  // RGBA
-const raw = Buffer.alloc((SIZE * 4 + 1) * SIZE);
-for (let y = 0; y < SIZE; y++) px.copy(raw, y * (SIZE * 4 + 1) + 1, y * SIZE * 4, (y + 1) * SIZE * 4);
+function png(SIZE) {
+  const px = render(SIZE);
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(SIZE, 0);
+  ihdr.writeUInt32BE(SIZE, 4);
+  ihdr[8] = 8;  // 8 bits par canal
+  ihdr[9] = 6;  // RGBA
+  const raw = Buffer.alloc((SIZE * 4 + 1) * SIZE);
+  for (let y = 0; y < SIZE; y++) px.copy(raw, y * (SIZE * 4 + 1) + 1, y * SIZE * 4, (y + 1) * SIZE * 4);
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', ihdr),
+    chunk('IDAT', zlib.deflateSync(raw, { level: 9 })),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
+}
 
-const png = Buffer.concat([
-  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-  chunk('IHDR', ihdr),
-  chunk('IDAT', zlib.deflateSync(raw, { level: 9 })),
-  chunk('IEND', Buffer.alloc(0)),
-]);
-const out = path.join(__dirname, '..', 'build', 'icon.png');
-fs.mkdirSync(path.dirname(out), { recursive: true });
-fs.writeFileSync(out, png);
-console.log('icône écrite : ' + out + ' (' + png.length + ' octets)');
+const root = path.join(__dirname, '..');
+for (const [file, size] of [['build/icon.png', 512], ['icons/icon-180.png', 180], ['icons/icon-192.png', 192]]) {
+  const out = path.join(root, file);
+  const data = png(size);
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  fs.writeFileSync(out, data);
+  console.log('icône écrite : ' + out + ' (' + data.length + ' octets)');
+}

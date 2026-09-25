@@ -1,9 +1,9 @@
 {
   "name": "typerider",
   "productName": "TypeRider",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "Jeu de dactylographie en pixel art : un voyage de l'écriture.",
-  "author": "Agneindeley Bile",
+  "author": "Bloodmyst",
   "license": "UNLICENSED",
   "private": true,
   "main": "electron/main.js",

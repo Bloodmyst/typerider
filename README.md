@@ -5,7 +5,7 @@ avant qu'ils ne touchent le sol. Chaque lettre juste déclenche un tir de votre
 véhicule, qui dégomme la lettre. Une faute ? Le mot continue de tomber et on le
 reprend au début.
 
-## Lancer le jeu (PC & Mac)
+## Lancer le jeu (PC, Mac, iPhone, iPad)
 
 Le jeu est 100 % HTML5, sans dépendance ni installation :
 
@@ -41,12 +41,39 @@ npm install          # installe Electron et electron-builder
 npm start            # lance le jeu dans une fenêtre Electron
 npm run dist:win     # construit les .exe dans dist/ (sous Windows)
 npm run dist:mac     # construit les .dmg dans dist/ (sous Mac)
-npm run icon         # régénère build/icon.png depuis le dessin de l'icône
+npm run icon         # régénère build/icon.png et icons/*.png depuis le dessin de l'icône
 ```
 
 Chaque tag de version poussé sur GitHub (`git tag v1.8.0` puis `git push origin v1.8.0`)
 lance l'automatisation `.github/workflows/desktop.yml` : elle construit les versions
 Windows et Mac sur les serveurs de GitHub et les publie dans une Release.
+
+### iPhone et iPad
+
+Le jeu se joue aussi au doigt sur iPhone et iPad (et sur les téléphones Android) :
+
+- Ouvrez la **version en ligne** dans Safari (voir *Mise en ligne* ci-dessous).
+- Pour l'avoir comme une app : bouton **Partager** → **Sur l'écran d'accueil**. Le jeu s'ouvre
+  alors en plein écran, sans barre Safari, et **fonctionne hors connexion** après une première ouverture.
+- Se joue en **mode portrait** (en paysage, sur téléphone, le jeu demande de tourner l'écran).
+
+Ce qui change sur écran tactile :
+
+| Élément | Au doigt |
+|---|---|
+| Clavier | un grand clavier tactile en bas de l'écran pendant la partie (AZERTY ou QWERTY), plusieurs doigts à la fois |
+| Power-ups | les touches ⏪ et 🪃 encadrent la dernière rangée du clavier, avec le nombre restant |
+| Barre du clavier | pause (❚❚), son / muet, AZERTY / QWERTY |
+| Menus | vrais boutons : difficulté < >, JOUER, BOUTIQUE, GARAGE, SON, clavier, VFX |
+| Boutique | toucher un onglet ou une ligne pour la choisir, glisser pour faire défiler, bouton ACHETER / ÉQUIPER |
+| Pause | REPRENDRE (ou toucher l'écran) et QUITTER LA PARTIE |
+| Fin de partie | REJOUER, MENU, BOUTIQUE |
+
+En modes Poussin et Enfant, la prochaine lettre à taper s'allume sur le clavier tactile.
+Un clavier physique (Bluetooth, Magic Keyboard) marche aussi : dès qu'on s'en sert, le clavier
+tactile se range, et il revient au premier toucher de l'écran.
+
+Sur iPhone, le son suit le bouton silencieux : s'il est activé, le jeu est muet.
 
 ### Mise en ligne
 
@@ -222,9 +249,11 @@ Les touches chiffrées marchent sur tous les claviers (AZERTY, QWERTY, Mac) sans
 ## Fichiers
 
 - `index.html` — page du jeu
-- `style.css` — plein écran, rendu pixelisé
+- `style.css` — plein écran, rendu pixelisé, réglages tactiles (pas de zoom ni de sélection)
+- `manifest.webmanifest`, `icons/` — installation sur l'écran d'accueil (iPhone, iPad, Android)
+- `sw.js` — mise en cache pour jouer hors connexion une fois installé
 - `electron/main.js` — fenêtre de l'application de bureau ; `package.json` — configuration de construction
-- `tools/make-icon.js` — génère l'icône de l'application
+- `tools/make-icon.js` — génère l'icône de l'application et les icônes web (`npm run icon`)
 - `vfx.js` — post-traitement WebGL (lueur, rayons, reflets, lumières, ondes de choc, chaleur, gouttes, étalonnage, grain)
 - `vehicles.js` — les 9 véhicules en pixel art procédural (roues, jambes, armes, accessoires, contour automatique)
 - `game.js` — moteur du jeu (décor en parallax, effets, audio synthé rétro, boutique, logique de jeu)
