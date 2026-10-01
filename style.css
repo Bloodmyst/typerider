@@ -106,21 +106,11 @@ canvas {
   font-size: 13px;
 }
 
-.tk-menu .tk {
-  max-width: none;
-  height: 54px;
-  font-size: 16px;
-}
 
-.tk.ok {
-  flex: 2 1 0;
-  background: #2e8f5a;
-}
 
 /* téléphone tourné en paysage : touches plus basses pour garder de la place au jeu */
 @media (max-height: 500px) {
   #tkb { gap: 4px; padding-top: 4px; }
   .tk-play { gap: 4px; }
   .tk { height: 34px; font-size: 16px; }
-  .tk-menu .tk { height: 40px; }
 }

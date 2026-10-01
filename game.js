@@ -30,9 +30,23 @@ const GROUND_LR = 14;    // hauteur du sol en pixels basse-rés
 let groundY = 0;         // y du sol en px réels
 
 // hauteur de la zone de jeu : tout l'écran, moins le clavier tactile sur téléphone
+// marges de sécurité de l'écran (encoche, Dynamic Island, barre d'accueil de l'iPhone)
+const SAFE = { t: 0, r: 0, b: 0, l: 0 };
+const safeProbe = document.createElement('div');
+safeProbe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;' +
+  'padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)';
+document.body.appendChild(safeProbe);
+function readSafe() {
+  const cs = getComputedStyle(safeProbe);
+  SAFE.t = parseFloat(cs.paddingTop) || 0;
+  SAFE.r = parseFloat(cs.paddingRight) || 0;
+  SAFE.b = parseFloat(cs.paddingBottom) || 0;
+  SAFE.l = parseFloat(cs.paddingLeft) || 0;
+}
 function viewH() { return Math.max(1, window.innerHeight - (touchPanel ? touchPanel.offsetHeight : 0)); }
 
 function resize() {
+  readSafe();
   W = Math.max(1, window.innerWidth);
   H = viewH();
   for (const c of [canvas, uiCanvas, vfxCanvas]) c.style.height = H + 'px';
@@ -1809,6 +1823,18 @@ let shopReturn = 'title'; // 'title' ou 'game'
 let lastGain = 0, lastNiveau = 0;
 let previewShotT = 0, previewAnchor = null;
 
+// boutons de l'interface : enregistrés à chaque image pendant le dessin, testés au toucher / au clic
+let hits = [], hitOx = 0, hitOy = 0;
+let shopListRect = null; // zone de la liste de la boutique (glisser pour défiler au doigt)
+function addHit(x, y, w, h, fn, label) { hits.push({ x: x + hitOx, y: y + hitOy, w, h, fn, label }); }
+function hitAt(list, x, y) {
+  for (let i = list.length - 1; i >= 0; i--) {
+    const b = list[i];
+    if (x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h) return b;
+  }
+  return null;
+}
+
 function shopRows() {
   const tab = SHOP_TABS[shopTab].id;
   if (tab === 'garage') return V.list.map((v, i) => ({ garage: true, i, v }));
@@ -2647,17 +2673,50 @@ function popBalloon(w) {
   AudioSys.pop();
 }
 
-if (ANNIV && typeof window !== 'undefined') {
-  // téléphone : on touche l'écran pour souffler les bougies. Sur iPhone, le son ne peut démarrer
-  // qu'au moment où le doigt quitte l'écran : on attend donc la fin du toucher.
-  const onTap = (e) => {
-    AudioSys.init();
-    if (e && e.target && e.target.closest && e.target.closest('#tkb')) return;
-    if (state === ST_TITLE && TOUCH_ONLY) blowCandles();
-  };
-  window.addEventListener('touchend', onTap, { passive: true });
-  window.addEventListener('pointerup', (e) => { if (e.pointerType !== 'touch') onTap(); });
+// Toucher et souris : un bouton se déclenche quand le doigt quitte l'écran (sur iPhone, le son ne
+// peut démarrer qu'à ce moment-là), sauf si le doigt a glissé. Glisser dans la liste de la boutique
+// fait défiler la sélection. Ailleurs sur l'écran titre, toucher souffle les bougies.
+let uiPress = null;
+function pressStart(id, x, y) {
+  uiPress = { id, x, y, lastY: y, moved: false, acc: 0, inList: !!(shopListRect && hitAt([shopListRect], x, y)) };
 }
+function pressMove(id, x, y) {
+  const p = uiPress;
+  if (!p || p.id !== id) return;
+  if (Math.abs(x - p.x) + Math.abs(y - p.y) > 12) p.moved = true;
+  if (p.inList && state === ST_SHOP) {
+    p.acc += p.lastY - y;
+    while (Math.abs(p.acc) >= 30) {
+      const d = Math.sign(p.acc), ni = shopIndex + d;
+      if (ni >= 0 && ni < shopRows().length) shopMove(d);
+      p.acc -= d * 30;
+    }
+  }
+  p.lastY = y;
+}
+function pressEnd(id, x, y) {
+  AudioSys.init();
+  const p = uiPress;
+  uiPress = null;
+  if (!p || p.id !== id || p.moved) return;
+  const b = hitAt(hits, x, y);
+  if (b) { b.fn(); return; }
+  if (ANNIV && state === ST_TITLE && TOUCH_ONLY) blowCandles();
+}
+const inTouchPanel = (e) => e.target && e.target.closest && e.target.closest('#tkb');
+const eachTouch = (fn) => (e) => {
+  if (inTouchPanel(e)) return;
+  for (const t of e.changedTouches) fn(t.identifier, t.clientX, t.clientY);
+};
+window.addEventListener('touchstart', eachTouch(pressStart), { passive: true });
+window.addEventListener('touchmove', eachTouch(pressMove), { passive: true });
+window.addEventListener('touchend', eachTouch(pressEnd), { passive: true });
+window.addEventListener('touchcancel', () => { uiPress = null; }, { passive: true });
+// souris et stylet (les toucher arrivent déjà par les événements touch)
+const notTouch = (fn) => (e) => { if (e.pointerType !== 'touch' && !inTouchPanel(e)) fn('m', e.clientX, e.clientY); };
+window.addEventListener('pointerdown', notTouch(pressStart));
+window.addEventListener('pointermove', notTouch(pressMove));
+window.addEventListener('pointerup', notTouch(pressEnd));
 
 // ===================== SAISIE =====================
 // une touche du vrai clavier ou du clavier tactile (même objet : key, code, preventDefault)
@@ -2706,11 +2765,7 @@ function onKey(e) {
     else if (e.key === 'g' || e.key === 'G') { lastGain = 0; openShop('title', tabIndex('garage')); }
     else if (ANNIV && state === ST_TITLE && /^[a-z]$/i.test(e.key)) titleLetter(e.key.toUpperCase());
     else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-      const dir = e.key === 'ArrowLeft' ? -1 : 1;
-      diffIndex = (diffIndex + dir + DIFFS.length) % DIFFS.length;
-      saveJSON('typerider.diff', diffIndex);
-      best = loadBest();
-      AudioSys.tone(520 + diffIndex * 90, 0.06, 'square', 0.04);
+      changeDiff(e.key === 'ArrowLeft' ? -1 : 1);
       if (state === ST_OVER) state = ST_TITLE; // retour au menu pour changer de mode
     }
     else if (e.key === 'Escape' && state === ST_OVER) { state = ST_TITLE; }
@@ -2736,6 +2791,20 @@ function onKey(e) {
   typeChar(ch);
 }
 window.addEventListener('keydown', onKey);
+
+function changeDiff(dir) {
+  diffIndex = (diffIndex + dir + DIFFS.length) % DIFFS.length;
+  saveJSON('typerider.diff', diffIndex);
+  best = loadBest();
+  AudioSys.tone(520 + diffIndex * 90, 0.06, 'square', 0.04);
+}
+
+// quitter la partie depuis la pause (le record est gardé)
+function quitToTitle() {
+  words = []; bullets = []; activeWord = null; evo = null;
+  if (score > best) { best = score; saveJSON('typerider.best.' + DIFFS[diffIndex].id, best); }
+  state = ST_TITLE;
+}
 
 function typeChar(ch) {
   if (activeWord && (activeWord.dying || words.indexOf(activeWord) === -1)) activeWord = null;
@@ -3526,20 +3595,64 @@ function drawHUD() {
   const acc = stats.typed > 0 ? Math.round((stats.typed - stats.errors) / stats.typed * 100) : 100;
   drawPixelTextOutline(ctx, 'MPM ' + currentMPM() + '   PRECISION ' + acc, pad, H - 30, 2, '#9fb3e8', '#101528');
 
-  drawInventory();
+  // au doigt, l'écran de fin a ses propres boutons : pas d'icônes de bonus par-dessus
+  if (!(TOUCH_ONLY && state === ST_OVER)) drawInventory();
 }
 
-function drawCenteredPanel(lines) {
-  // lines: [{text, scale, color, gap}]
-  let totalH = 0;
-  for (const l of lines) totalH += 7 * l.scale + (l.gap || 12);
+function drawCenteredPanel(lines, extraH) {
+  // lines: [{text, scale, color, gap}] ; sur écran étroit, les lignes trop longues passent à la ligne
+  const maxW = W - 24 - SAFE.l - SAFE.r;
+  const rows = [];
+  for (const l of lines) {
+    let sc = l.scale;
+    while (sc > 2 && textWidth(l.text, sc) > maxW) sc--;
+    const parts = wrapText(l.text, sc, maxW);
+    parts.forEach((t, i) => rows.push({ text: t, scale: sc, color: l.color,
+      gap: i < parts.length - 1 ? 8 : (l.gap || 12) }));
+  }
+  let totalH = extraH || 0;
+  for (const l of rows) totalH += 7 * l.scale + l.gap;
   let y = Math.round(H / 2 - totalH / 2);
   ctx.fillStyle = 'rgba(8,12,28,0.55)';
   ctx.fillRect(0, y - 30, W, totalH + 60);
-  for (const l of lines) {
+  for (const l of rows) {
     drawPixelTextOutline(ctx, l.text, W / 2, y, l.scale, l.color, '#101528', 'center');
-    y += 7 * l.scale + (l.gap || 12);
+    y += 7 * l.scale + l.gap;
   }
+  return y; // bas du texte : les boutons tactiles se placent dessous
+}
+
+// texte qui passe à la ligne pour tenir dans la largeur (coupe d'abord aux grands espaces)
+function wrapText(text, scale, maxW) {
+  if (textWidth(text, scale) <= maxW) return [text];
+  const out = [];
+  for (const part of text.split(/ {3,}/)) {
+    let line = '';
+    for (const word of part.split(/ +/)) {
+      const t = line ? line + ' ' + word : word;
+      if (line && textWidth(t, scale) > maxW) { out.push(line); line = word; }
+      else line = t;
+    }
+    if (line) out.push(line);
+  }
+  return out;
+}
+
+// bouton pixel : fond sombre, liseré coloré, texte centré ; enregistre sa zone de toucher
+function drawButton(x, y, w, h, label, scale, col, fn, opt) {
+  opt = opt || {};
+  x = Math.round(x); y = Math.round(y); w = Math.round(w); h = Math.round(h);
+  ctx.fillStyle = opt.fill || 'rgba(8,12,28,0.78)';
+  ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = col;
+  ctx.fillRect(x, y, w, 2);
+  ctx.fillRect(x, y + h - 3, w, 3);
+  ctx.fillRect(x, y, 2, h);
+  ctx.fillRect(x + w - 2, y, 2, h);
+  let s = scale;
+  while (s > 1 && textWidth(label, s) > w - 12) s--;
+  drawPixelTextOutline(ctx, label, x + w / 2, y + Math.round((h - 7 * s) / 2), s, opt.text || '#ffffff', '#101528', 'center');
+  if (fn) addHit(x, y, w, h, fn, label);
 }
 
 function draw(dt) {
@@ -3550,6 +3663,10 @@ function draw(dt) {
   }
   uictx.setTransform(1, 0, 0, 1, 0, 0);
   uictx.clearRect(0, 0, W, H);
+  hits = [];
+  shopListRect = null;
+  hitOx = Math.round(ox);
+  hitOy = Math.round(oy);
   for (const c of [sceneCtx, uictx]) {
     c.save();
     c.translate(Math.round(ox), Math.round(oy));
@@ -3626,6 +3743,14 @@ function drawPlay() {
       { text: BIOMES[pendingBiome >= 0 ? pendingBiome : (biomeFade ? biomeFade.to : biomeIndex)].name + '   METEO : ' + WEATHER_NAMES[weather], scale: 2, color: '#9fb3e8', gap: 8 },
       { text: blink ? 'PREPAREZ-VOUS' : ' ', scale: 2, color: '#7ad9ff', gap: 0 },
     ]);
+  } else if (state === ST_PAUSE && TOUCH_ONLY) {
+    const by = drawCenteredPanel([
+      { text: 'PAUSE', scale: 6, color: '#7ad9ff', gap: 24 },
+    ], 124);
+    const bw = Math.min(W - 48, 300);
+    addHit(0, 0, W, H, () => { state = ST_PLAY; }); // toucher n'importe où : reprendre
+    drawButton(W / 2 - bw / 2, by, bw, 56, 'REPRENDRE', 3, '#7affc0', () => { state = ST_PLAY; });
+    drawButton(W / 2 - bw / 2, by + 68, bw, 44, 'QUITTER LA PARTIE', 2, '#ff6b6b', quitToTitle);
   } else if (state === ST_PAUSE) {
     drawCenteredPanel([
       { text: 'PAUSE', scale: 6, color: '#7ad9ff', gap: 20 },
@@ -3634,7 +3759,7 @@ function drawPlay() {
   } else if (state === ST_OVER) {
     const acc = stats.typed > 0 ? Math.round((stats.typed - stats.errors) / stats.typed * 100) : 100;
     const avgMpm = playT > 5 ? Math.round(((stats.typed - stats.errors) / 5) / (playT / 60)) : 0;
-    drawCenteredPanel([
+    const lines = [
       ANNIV
         ? { text: 'BRAVO' + (PRENOM ? ' ' + PRENOM : '') + ' !', scale: 5, color: '#ffd93b', gap: 24 }
         : { text: 'PARTIE TERMINEE', scale: 5, color: '#ff6b6b', gap: 24 },
@@ -3643,9 +3768,19 @@ function drawPlay() {
       { text: 'MOTS ' + stats.wordsDone + '   PRECISION ' + acc + '/100   MEILLEUR COMBO ' + stats.bestCombo, scale: 2, color: '#9fb3e8', gap: 10 },
       { text: 'MPM MOYEN ' + avgMpm + '   MPM MAX ' + peakMpm + '   NIVEAU ' + niveauCourant(), scale: 2, color: '#9fb3e8', gap: 10 },
       { text: 'CREDITS ' + credits, scale: 2, color: '#ffd93b', gap: 20 },
-      { text: Math.sin(gameT * 4) > -0.3 ? 'ENTREE POUR REJOUER' : ' ', scale: 3, color: '#7affc0', gap: 12 },
-      { text: 'ECHAP : MENU (CHANGER DE DIFFICULTE)', scale: 2, color: '#9fb3e8', gap: 0 },
-    ]);
+    ];
+    if (TOUCH_ONLY) {
+      const by = drawCenteredPanel(lines, 110);
+      const bw = Math.min(W - 48, 320), hw = (bw - 12) / 2;
+      drawButton(W / 2 - bw / 2, by, bw, 56, 'REJOUER', 4, '#7affc0', () => startGame());
+      drawButton(W / 2 - bw / 2, by + 66, hw, 44, 'MENU', 2, '#9fb3e8', () => { state = ST_TITLE; });
+      drawButton(W / 2 + 6, by + 66, hw, 44, 'BOUTIQUE', 2, '#ffd93b', () => { lastGain = 0; openShop('title', tabIndex('skin')); });
+    } else {
+      drawCenteredPanel(lines.concat([
+        { text: Math.sin(gameT * 4) > -0.3 ? 'ENTREE POUR REJOUER' : ' ', scale: 3, color: '#7affc0', gap: 12 },
+        { text: 'ECHAP : MENU (CHANGER DE DIFFICULTE)', scale: 2, color: '#9fb3e8', gap: 0 },
+      ]));
+    }
   }
 }
 
@@ -3731,7 +3866,7 @@ function drawShop(dt) {
   ctx.fillRect(-20, -20, W + 40, H + 40);
   ctx = uictx;
 
-  let y = Math.max(16, Math.round(H * 0.04));
+  let y = Math.max(16, Math.round(H * 0.04)) + SAFE.t;
   drawPixelTextOutline(ctx, 'BOUTIQUE', W / 2, y, 5, '#ffd93b', '#101528', 'center');
   y += 48;
   if (shopReturn === 'game' && lastGain > 0) {
@@ -3741,32 +3876,47 @@ function drawShop(dt) {
   drawPixelTextOutline(ctx, 'CREDITS : ' + credits, W / 2, y, 3, '#ffd93b', '#101528', 'center');
   y += 40;
 
-  // onglets
-  const tabW = SHOP_TABS.map(t => textWidth(t.name, 2) + 28);
-  const total = tabW.reduce((a, b) => a + b, 0) + (SHOP_TABS.length - 1) * 8;
-  let tx = Math.round(W / 2 - total / 2);
+  // onglets (sur plusieurs lignes si l'écran est étroit ; chacun se touche du doigt)
+  const tabW = SHOP_TABS.map(t => textWidth(t.name, 2) + (W < 560 ? 20 : 28));
+  const tabRows = [[]];
+  let rowW = 0;
   SHOP_TABS.forEach((t, i) => {
-    const on = i === shopTab;
-    ctx.fillStyle = on ? 'rgba(255,217,59,0.18)' : 'rgba(122,217,255,0.06)';
-    ctx.fillRect(tx, y - 8, tabW[i], 30);
-    ctx.fillStyle = on ? '#ffd93b' : 'rgba(159,179,232,0.4)';
-    ctx.fillRect(tx, y + 20, tabW[i], 2);
-    drawPixelTextOutline(ctx, t.name, tx + tabW[i] / 2, y, 2, on ? '#ffffff' : '#9fb3e8', '#101528', 'center');
-    tx += tabW[i] + 8;
+    if (rowW && rowW + 8 + tabW[i] > W - 16) { tabRows.push([]); rowW = 0; }
+    tabRows[tabRows.length - 1].push(i);
+    rowW += (rowW ? 8 : 0) + tabW[i];
   });
-  y += 46;
+  for (const tr of tabRows) {
+    const total = tr.reduce((a, i) => a + tabW[i], 0) + (tr.length - 1) * 8;
+    let tx = Math.round(W / 2 - total / 2);
+    for (const i of tr) {
+      const t = SHOP_TABS[i], on = i === shopTab;
+      ctx.fillStyle = on ? 'rgba(255,217,59,0.18)' : 'rgba(122,217,255,0.06)';
+      ctx.fillRect(tx, y - 8, tabW[i], 30);
+      ctx.fillStyle = on ? '#ffd93b' : 'rgba(159,179,232,0.4)';
+      ctx.fillRect(tx, y + 20, tabW[i], 2);
+      drawPixelTextOutline(ctx, t.name, tx + tabW[i] / 2, y, 2, on ? '#ffffff' : '#9fb3e8', '#101528', 'center');
+      addHit(tx, y - 12, tabW[i], 38, () => { if (shopTab !== i) shopTabMove(i - shopTab); }, t.name);
+      tx += tabW[i] + 8;
+    }
+    y += 38;
+  }
+  y += 8;
 
   // liste à gauche, aperçu à droite (empilés si l'écran est étroit)
   const wide = W >= 720;
   const colW = wide ? Math.min(380, W / 2 - 30) : W - 40;
   const listL = wide ? W / 2 - 10 - colW + 12 : 32;
   const listR = wide ? W / 2 - 10 : W - 20;
-  const pvH = Math.round(Math.max(200, Math.min(300, H * 0.32)));
+  const footH = TOUCH_ONLY ? 74 + SAFE.b : 70;
+  let pvH = Math.round(Math.max(200, Math.min(300, H * 0.32)));
+  // paysage sur téléphone : l'aperçu et sa légende s'arrêtent au-dessus des boutons du bas
+  if (wide) pvH = Math.max(110, Math.min(pvH, H - footH - y - 64));
   drawShopPreview(wide ? W / 2 + 10 : 20, y, colW, pvH, dt);
   const listY = wide ? y + 8 : y + pvH + 76;
 
   const rows = shopRows();
   const entries = [];
+  const rowH = TOUCH_ONLY ? 34 : 24, rowPad = (rowH - 14) / 2; // lignes plus hautes sous le doigt
   let sub = null, yy = 0;
   rows.forEach((it, i) => {
     if (it.sub && it.sub !== sub) {
@@ -3775,16 +3925,17 @@ function drawShop(dt) {
       yy += yy ? 32 : 26;
     }
     entries.push({ it, i, y: yy });
-    yy += 24;
+    yy += rowH;
   });
   // défilement pour garder la ligne choisie visible
-  const avail = H - 70 - listY;
+  const avail = H - footH - listY;
   const selE = entries.find(e => e.i === shopIndex);
-  const scroll = selE && selE.y + 24 > avail ? selE.y + 24 - avail : 0;
+  const scroll = selE && selE.y + rowH > avail ? selE.y + rowH - avail : 0;
   ctx.save();
   ctx.beginPath();
   ctx.rect(listL - 16, listY - 8, listR - listL + 28, Math.max(0, avail + 8));
   ctx.clip();
+  shopListRect = { x: listL - 16 + hitOx, y: listY - 8 + hitOy, w: listR - listL + 28, h: Math.max(0, avail + 8) };
   for (const e of entries) {
     const ey = listY + e.y - scroll;
     if (e.hdr) {
@@ -3792,9 +3943,17 @@ function drawShop(dt) {
       continue;
     }
     const it = e.it, sel = e.i === shopIndex;
+    // toucher une ligne la choisit ; toucher la ligne déjà choisie achète / équipe
+    if (ey > listY - 12 && ey + 16 < listY + avail) {
+      const idx = e.i;
+      addHit(listL - 12, ey - rowPad, listR - listL + 20, rowH, () => {
+        if (idx === shopIndex) shopAction();
+        else { shopIndex = idx; if (it.garage) garageSel = idx; AudioSys.tone(500, 0.04, 'square', 0.03); }
+      });
+    }
     if (sel) {
       ctx.fillStyle = 'rgba(122,217,255,0.14)';
-      ctx.fillRect(listL - 12, ey - 5, listR - listL + 20, 24);
+      ctx.fillRect(listL - 12, ey - rowPad, listR - listL + 20, rowH);
       drawPixelText(ctx, '>', listL - 6, ey, 2, '#7ad9ff');
     }
     const name = it.garage ? (it.i + 1) + ' ' + (it.i < garageMax ? it.v.name : '?????') : it.name;
@@ -3805,6 +3964,27 @@ function drawShop(dt) {
   ctx.restore();
 
   const tab = SHOP_TABS[shopTab].id;
+  if (TOUCH_ONLY) {
+    // en bas : l'action sur la ligne choisie et le retour
+    const by = H - 62 - SAFE.b, bw = Math.min(W - 32, 520);
+    const cur = rows[shopIndex];
+    const st = cur && !cur.garage ? shopRowStatus(cur)[0] : '';
+    const act = !cur || cur.garage || st === 'INDISPONIBLE' ? null
+      : st.endsWith(' CR') ? 'ACHETER'
+      : tab === 'perso' ? (st === 'CHOISI' ? null : 'CHOISIR')
+      : tab === 'vfx' || tab === 'fx' ? (st === 'ACTIF' ? 'DESACTIVER' : 'ACTIVER')
+      : st === 'EQUIPE' ? (tab === 'acc' ? 'RETIRER' : null)
+      : 'EQUIPER';
+    const back = shopReturn === 'game' ? 'CONTINUER' : 'RETOUR';
+    if (act) {
+      const hw = (bw - 12) / 2;
+      drawButton(W / 2 - bw / 2, by, hw, 48, act, 2, '#7affc0', shopAction);
+      drawButton(W / 2 + 6, by, hw, 48, back, 2, '#7ad9ff', closeShop);
+    } else {
+      drawButton(W / 2 - bw / 2, by, bw, 48, back, 2, '#7ad9ff', closeShop);
+    }
+    return;
+  }
   const hint = tab === 'garage' ? 'HAUT/BAS : VOIR UN VEHICULE'
     : 'ENTREE : ' + (tab === 'perso' ? 'CHOISIR' : tab === 'vfx' ? 'ACTIVER / COUPER' : tab === 'fx' ? 'ACHETER / ACTIVER' : 'ACHETER / EQUIPER');
   drawPixelTextOutline(ctx, 'GAUCHE/DROITE : ONGLET   ' + hint, W / 2, H - 54, 2, '#dfe6ff', '#101528', 'center');
@@ -3859,43 +4039,24 @@ function buildTouchPanel() {
   extra.className = 'tk-row';
   mk(extra, '⏪ REMONTE-TEMPS', '1', 'Digit1', 'wide');
   mk(extra, 'BOOMERANG', '2', 'Digit2', 'wide');
-  mk(extra, 'PAUSE', 'Escape', 'Escape', 'pause');
+  root._pause = mk(extra, 'PAUSE', 'Escape', 'Escape', 'pause');
   play.appendChild(extra);
-  const menu = document.createElement('div');
-  menu.className = 'tk-row tk-menu';
-  root._mb = {
-    left: mk(menu, '◀', 'ArrowLeft', 'ArrowLeft'), up: mk(menu, '▲', 'ArrowUp', 'ArrowUp'),
-    down: mk(menu, '▼', 'ArrowDown', 'ArrowDown'), right: mk(menu, '▶', 'ArrowRight', 'ArrowRight'),
-    ok: mk(menu, 'JOUER', 'Enter', 'Enter', 'ok'), back: mk(menu, 'RETOUR', 'Escape', 'Escape'),
-    shop: mk(menu, 'BOUTIQUE', 'b', 'KeyB'),
-  };
   root.appendChild(play);
-  root.appendChild(menu);
-  root._play = play;
-  root._menu = menu;
   root._view = '';
   return root;
 }
 
-// boutons utiles selon l'écran, et la prochaine lettre à taper allumée
+// le clavier n'apparaît que pendant la partie (les menus ont leurs boutons à l'écran),
+// et la prochaine lettre à taper s'allume
 function updateTouchPanel() {
   if (!touchPanel) return;
-  const T = touchPanel, mb = T._mb;
-  const playing = state === ST_PLAY || state === ST_BREAK;
-  const view = playing ? 'play' : 'menu|' + state;
+  const T = touchPanel;
+  const view = state === ST_PLAY ? 'play' : state === ST_BREAK ? 'break' : state === ST_PAUSE ? 'pause' : 'off';
   if (view !== T._view) {
     T._view = view;
-    T._play.style.display = playing ? '' : 'none';
-    T._menu.style.display = playing ? 'none' : '';
-    const show = (b, on) => { b.style.display = on ? '' : 'none'; };
-    const shop = state === ST_SHOP;
-    show(mb.up, shop);
-    show(mb.down, shop);
-    show(mb.left, state === ST_TITLE || shop);
-    show(mb.right, state === ST_TITLE || shop);
-    show(mb.back, shop || state === ST_OVER);
-    show(mb.shop, state === ST_TITLE);
-    mb.ok.textContent = state === ST_PAUSE ? 'REPRENDRE' : state === ST_OVER ? 'REJOUER' : shop ? 'OK' : 'JOUER';
+    T.style.display = view === 'off' ? 'none' : '';
+    T._pause.textContent = view === 'pause' ? 'REPRENDRE' : 'PAUSE';
+    T._pause.style.opacity = view === 'break' ? '0.4' : ''; // pas de pause pendant l'annonce de la vague
   }
   const hint = state === ST_PLAY ? nextKeyHint() : null;
   if (hint !== T._hint) {
@@ -3911,15 +4072,54 @@ function drawTouchNotice() {
   const y = Math.round(H * 0.18);
   drawPixelTextOutline(ctx, 'TYPE', W / 2 - s, y, s, '#ffe97a', '#101528', 'right');
   drawPixelTextOutline(ctx, 'RIDER', W / 2 + s, y, s, '#7ad9ff', '#101528', 'left');
-  const lines = ['TAPE LES MOTS QUI TOMBENT', 'AVEC LE CLAVIER EN BAS', '', '< ' + DIFFS[diffIndex].name + ' >', '', 'TOUCHE JOUER'];
+  const lines = ['TAPE LES MOTS QUI TOMBENT', 'AVEC LE CLAVIER EN BAS'];
   const ts = W < 420 ? 2 : 3;
   let ly = y + 7 * s + 40;
   ctx.fillStyle = 'rgba(8,12,28,0.72)';
-  ctx.fillRect(12, ly - 18, W - 24, lines.length * (7 * ts + 14) + 24);
+  ctx.fillRect(12, ly - 18, W - 24, lines.length * (7 * ts + 14) + titleButtonsH('stack') + 24);
   for (const l of lines) {
-    drawPixelTextShadow(ctx, l, W / 2, ly, ts, l === 'TOUCHE JOUER' ? '#7affc0' : l.startsWith('<') ? DIFFS[diffIndex].color : '#f2f5ff', 'center');
+    drawPixelTextShadow(ctx, l, W / 2, ly, ts, '#f2f5ff', 'center');
     ly += 7 * ts + 14;
   }
+  drawTitleButtons(ly - 12, 'stack');
+}
+
+// boutons de l'écran titre : en colonne (portrait) ou sur une ligne (paysage, peu de hauteur)
+function titleButtonsH(mode) { return mode === 'row' ? 12 + 48 : 12 + 44 + 10 + 56 + 10 + 44; }
+function drawTitleButtons(y, mode) {
+  const goShop = () => { lastGain = 0; openShop('title', tabIndex('skin')); };
+  const goGarage = () => { lastGain = 0; openShop('title', tabIndex('garage')); };
+  const pc = Math.sin(gameT * 4) > 0 ? '#7affc0' : '#c8ffe4';
+  const playOpt = { fill: 'rgba(20,60,50,0.85)', text: pc };
+  y += 12;
+  if (mode === 'row') {
+    // [<] NOM [>]   [JOUER]   [BOUTIQUE]
+    const bw = Math.min(W - 24 - SAFE.l - SAFE.r, 760), x0 = W / 2 - bw / 2, gap = 10;
+    const dw = Math.round(bw * 0.42), rest = bw - dw - gap * 2, jw = Math.round(rest * 0.55);
+    drawDiffSelector(x0, y, dw, 48);
+    drawButton(x0 + dw + gap, y, jw, 48, 'JOUER', 4, pc, () => startGame(), playOpt);
+    drawButton(x0 + dw + gap * 2 + jw, y, rest - jw, 48, 'BOUTIQUE', 2, '#ffd93b', goShop);
+    return;
+  }
+  const bw = Math.min(W - 32, 360), x0 = W / 2 - bw / 2, hw = (bw - 12) / 2;
+  drawDiffSelector(x0, y, bw, 44);
+  y += 54;
+  drawButton(x0, y, bw, 56, 'JOUER', 5, pc, () => startGame(), playOpt);
+  y += 66;
+  drawButton(x0, y, hw, 44, 'BOUTIQUE', 2, '#ffd93b', goShop);
+  drawButton(x0 + hw + 12, y, hw, 44, 'GARAGE', 2, '#ffd93b', goGarage);
+}
+// < NOM > : les flèches sont de grandes zones à toucher, le nom passe au mode suivant
+function drawDiffSelector(x, y, w, h) {
+  const d = DIFFS[diffIndex];
+  drawButton(x, y, 48, h, '<', 3, '#9fb3e8', () => changeDiff(-1));
+  drawButton(x + w - 48, y, 48, h, '>', 3, '#9fb3e8', () => changeDiff(1));
+  ctx.fillStyle = 'rgba(8,12,28,0.6)';
+  ctx.fillRect(Math.round(x + 52), Math.round(y), Math.round(w - 104), h);
+  let s = 3;
+  while (s > 2 && textWidth(d.name, s) > w - 112) s--;
+  drawPixelTextShadow(ctx, d.name, Math.round(x + w / 2), Math.round(y + (h - 7 * s) / 2), s, d.color, 'center');
+  addHit(x + 52, y, w - 104, h, () => changeDiff(1));
 }
 
 // lettres arc-en-ciel qui ondulent
@@ -3941,7 +4141,7 @@ const annivMsg = () => [AGE ? AGE + ' ANS' : '', ANNIV_MSG].filter(Boolean).join
 
 function drawTouchNoticeAnniv() {
   const name = annivName(), msg = annivMsg();
-  const top = 15 * Math.max(2, PX);
+  const top = 15 * Math.max(2, PX) + SAFE.t;
   // le texte s'arrête au-dessus de Kimlu et du gâteau (26 cellules de haut)
   const bottom = turret.y - (Math.max(charPx(garageMax), 26 * vu()) + 8 * vu());
   const avail = bottom - top;
@@ -3956,21 +4156,25 @@ function drawTouchNoticeAnniv() {
     return lines.map(l => l.replace(/\u00a0/g, ' ')); // la police pixel ne connaît que l'espace normale
   };
   // du plus grand au plus petit : on garde la première taille qui tient en hauteur
-  const tryLayout = (s1, oneLine, withPlay) => {
+  const tryLayout = (s1, oneLine, mode, full) => {
     const head = oneLine ? ['JOYEUX ANNIVERSAIRE'] : ['JOYEUX', 'ANNIVERSAIRE'];
     const sn = Math.min(fitScale(name, 8, 24), s1 + 2);
     const ts = s1 >= 5 ? 3 : 2;
-    const msgLines = msg ? wrap(msg, 2) : [];
-    const tapLines = candlesLit ? ['TOUCHE L\'ECRAN POUR', 'SOUFFLER LES BOUGIES'] : ['FAIS UN VOEU !'];
-    const h = head.length * (7 * s1 + 12) + 4 + 7 * sn + 20 + msgLines.length * 22 + (msg ? 10 : 0)
-      + tapLines.length * (7 * ts + 10) + (withPlay ? 12 + 7 * 3 + 12 + 22 : 0);
-    return { head, s1, sn, ts, msgLines, tapLines, withPlay, h };
+    const msgLines = msg && full ? wrap(msg, 2) : [];
+    const tapLines = !full ? [] : candlesLit ? ['TOUCHE L\'ECRAN POUR', 'SOUFFLER LES BOUGIES'] : ['FAIS UN VOEU !'];
+    const h = head.length * (7 * s1 + 12) + 4 + 7 * sn + 20 + msgLines.length * 22 + (msgLines.length ? 10 : 0)
+      + tapLines.length * (7 * ts + 10) + titleButtonsH(mode);
+    return { head, s1, sn, ts, msgLines, tapLines, mode, h };
   };
+  // les boutons restent toujours : on réduit d'abord le texte, puis on retire message et consigne
   const options = [];
-  for (const withPlay of [true, false]) {
-    for (let s = 6; s >= 2; s--) {
-      if (textWidth('JOYEUX ANNIVERSAIRE', s) <= W - 24) options.push(tryLayout(s, true, withPlay));
-      if (textWidth('ANNIVERSAIRE', s) <= W - 24) options.push(tryLayout(s, false, withPlay));
+  const modes = W >= 640 ? ['stack', 'row'] : ['stack'];
+  for (const full of [true, false]) {
+    for (const mode of modes) {
+      for (let s = 6; s >= 2; s--) {
+        if (textWidth('JOYEUX ANNIVERSAIRE', s) <= W - 24) options.push(tryLayout(s, true, mode, full));
+        if (textWidth('ANNIVERSAIRE', s) <= W - 24) options.push(tryLayout(s, false, mode, full));
+      }
     }
   }
   const L = options.find(o => o.h <= avail) || options[options.length - 1];
@@ -3992,14 +4196,7 @@ function drawTouchNoticeAnniv() {
     drawPixelTextShadow(ctx, l, W / 2, y, L.ts, '#f2f5ff', 'center');
     y += 7 * L.ts + 10;
   }
-  if (L.withPlay) {
-    // difficulté (boutons ◀ ▶ du clavier tactile) et invitation à jouer
-    const d = DIFFS[diffIndex];
-    y += 12;
-    drawPixelTextShadow(ctx, '< ' + d.name + ' >', W / 2, y, 3, d.color, 'center');
-    y += 7 * 3 + 12;
-    drawPixelTextShadow(ctx, 'TOUCHE JOUER POUR COMMENCER', W / 2, y, 2, '#9fb3e8', 'center');
-  }
+  drawTitleButtons(y - 10, L.mode);
 }
 
 function drawTitle() {
@@ -4172,6 +4369,11 @@ requestAnimationFrame(frame);
 // hook de test, réservé au développement : ouvrir le jeu avec ?debug dans l'adresse
 if (/[?&]debug\b/.test(location.search)) window.__TR = {
   get state() { return state; },
+  get hits() { return hits.map(h => ({ x: h.x, y: h.y, w: h.w, h: h.h, label: h.label })); },
+  get diff() { return diffIndex; },
+  get shopTab() { return SHOP_TABS[shopTab].id; },
+  get shopIndex() { return shopIndex; },
+  gameOver() { lives = 0; state = ST_OVER; },
   get score() { return score; },
   get combo() { return combo; },
   get lives() { return lives; },
