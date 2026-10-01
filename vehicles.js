@@ -24,8 +24,8 @@ const FIXED = {
   t: '#1f2230', T: '#454a5c', s: '#a3adc2', S: '#6a7389',
   w: '#8fd3ff', W: '#e6f7ff', r: '#ff4a4a', y: '#ffe97a',
   b: '#8a5a33', B: '#5c3a20', n: '#2a3050',
-  // Kimlu : cheveux, reflet, nœud, ombre du nœud, joues
-  u: '#3b2238', U: '#7a4766', v: '#ff5d8f', V: '#c2386f', x: '#ff9ec4',
+  // Kimlu : cheveux brun très foncé et leur reflet, boucles d'oreilles (or + pierre bleu-vert)
+  u: '#2b1b1e', U: '#5b3b38', E: '#ffd93b', z: '#3fd0c0',
 };
 
 // jeux de couleurs achetables : m = principale, d = sombre, l = claire, a = accent, g = lueur
@@ -45,13 +45,21 @@ function darken(hex, k) {
 
 // palette complète selon le skin et la tenue du pilote (j/J/q = veste)
 const palCache = {};
-function palette(skinId, jacket) {
-  const key = skinId + '|' + jacket;
+// Kimlu garde sa tenue quel que soit le véhicule : robe bleu canard, legging noir, bottes marron
+const KIMLU_LOOK = {
+  k: '#e9b48e', K: '#c98b67',
+  j: '#1f9a95', J: '#45c2b8', q: '#14706d',
+  p: '#262433', P: '#17151f',
+};
+
+function palette(skinId, jacket, char) {
+  const key = skinId + '|' + jacket + '|' + char;
   if (palCache[key]) return palCache[key];
   const s = SKINS[skinId] || SKINS.skin_bleu;
   const P = Object.assign({}, FIXED, s, { A: darken(s.a, 0.3) });
   if (jacket === 'cream') Object.assign(P, { j: P.c, J: P.e, q: P.C });
   else Object.assign(P, { j: P.m, J: P.l, q: P.d });
+  if (char === 'kimlu') Object.assign(P, KIMLU_LOOK);
   palCache[key] = P;
   return P;
 }
@@ -92,36 +100,36 @@ const SPRITES = {
   ],
   // Kimlu : mêmes dimensions et mêmes points d'attache que le pilote d'origine
   torsoK: [
-    '...vv.uuuu..',
-    '..vVvuuuuuu.',
-    '...vuuuUuuuu',
-    '..uuuuukkkk.',
+    '...uuuuu....',
+    '..uuuuuuuu..',
+    '.uuuuuuuUuu.',
+    '.uuuuuuukkk.',
     '.uuukkkkokk.',
     '.uuukkkkkkkK',
-    'uuu.kkkkxkk.',
-    'uu..KKkkk...',
-    'uuaajjjjjj..',
-    'uaaajjJJJjj.',
-    'uaaajjjjjjj.',
-    '.aAajjjjjjj.',
-    '.aaajjjjjjqq',
-    '..aa.qqqqqqq',
+    'uuuuEkkkkee.',
+    'uuuuzKkkk...',
+    'uuukjjjjjj..',
+    'uuukjjJJJjj.',
+    'uuujjjjjjjj.',
+    '.uuqjjjjjjj.',
+    '..uqjjjjjjqq',
+    '...qqqqqqqqq',
   ],
   helmetK: [
     '....mmmm....',
-    '...mmvmmmm..',
+    '...mmmmmmm..',
     '..mmmmmmmmm.',
     '..mmlmgggggg',
-    '.ummmgWggggg',
-    'uummmgggggg.',
-    'uu.mmmmmmmd.',
-    'u...SSkkk...',
-    'uuaajjjjjj..',
-    'uaaajjJJJjj.',
-    'uaaajjjjjjj.',
-    '.aAajjjjjjj.',
-    '.aaajjjjjjqq',
-    '..aa.qqqqqqq',
+    '..mmmgWggggg',
+    '.ummmgggggg.',
+    'uuummmmmmmd.',
+    'uuuuSSkkk...',
+    'uuukjjjjjj..',
+    'uuukjjJJJjj.',
+    'uuujjjjjjjj.',
+    '.uuqjjjjjjj.',
+    '..uqjjjjjjqq',
+    '...qqqqqqqqq',
   ],
 };
 
@@ -582,7 +590,7 @@ for (const v of VEHICLES) {
    o = { t, travel, angle, recoil, skin, acc, white (0..1), dark (silhouette) } */
 function render(tier, o) {
   const def = VEHICLES[Math.max(0, Math.min(VEHICLES.length - 1, tier - 1))];
-  const P = palette(o.skin, def.jacket);
+  const P = palette(o.skin, def.jacket, o.char);
   g.setTransform(1, 0, 0, 1, 0, 0);
   g.clearRect(0, 0, CW, CH);
   g.setTransform(1, 0, 0, 1, AX, AY);

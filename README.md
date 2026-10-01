@@ -65,7 +65,8 @@ repart de zéro. Le hook de test `window.__TR` n'existe que si l'adresse contien
 Une version spéciale pour fêter un anniversaire, réglable dans **`anniversaire.js`**
 (prénom, âge, message, crédits offerts ; `actif: false` pour revenir au jeu normal) :
 
-- **Kimlu**, nouvelle héroïne (cheveux longs, queue de cheval, nœud rose), sur les 9 véhicules ;
+- **Kimlu**, nouvelle héroïne (longs cheveux brun foncé avec une mèche sur le côté, grand sourire,
+  boucles d'oreilles pendantes, robe bleu canard, legging noir et bottes marron), sur les 9 véhicules ;
   le choix du pilote se fait dans l'onglet **PERSO** de la boutique.
 - Écran titre : **JOYEUX ANNIVERSAIRE** en lettres arc-en-ciel, le prénom, le message,
   guirlandes de fanions, pluie de confettis, ballons qui montent dans le ciel.
