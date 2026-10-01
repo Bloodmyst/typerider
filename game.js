@@ -29,9 +29,13 @@ const fctx = fg.getContext('2d');
 const GROUND_LR = 14;    // hauteur du sol en pixels basse-rés
 let groundY = 0;         // y du sol en px réels
 
+// hauteur de la zone de jeu : tout l'écran, moins le clavier tactile sur téléphone
+function viewH() { return Math.max(1, window.innerHeight - (touchPanel ? touchPanel.offsetHeight : 0)); }
+
 function resize() {
   W = Math.max(1, window.innerWidth);
-  H = Math.max(1, window.innerHeight);
+  H = viewH();
+  for (const c of [canvas, uiCanvas, vfxCanvas]) c.style.height = H + 'px';
   canvas.width = W;
   canvas.height = H;
   uiCanvas.width = W;
@@ -1912,7 +1916,9 @@ let kbPref = loadJSON('typerider.kb', { show: null, layout: 'azerty' });
 let lastKey = null; // dernière touche tapée, pour l'éclairer brièvement
 
 // affiché par défaut dans les modes enfants, masquable avec F4
-function keyboardVisible() { return kbPref.show === null ? DIFFS[diffIndex].pool !== 'full' : kbPref.show; }
+function keyboardVisible() {
+  if (TOUCH_ONLY) return false; // sur téléphone, le vrai clavier tactile le remplace
+  return kbPref.show === null ? DIFFS[diffIndex].pool !== 'full' : kbPref.show; }
 
 function keyPos(ch) {
   const rows = KB_LAYOUTS[kbPref.layout];
@@ -2644,8 +2650,9 @@ function popBalloon(w) {
 if (ANNIV && typeof window !== 'undefined') {
   // téléphone : on touche l'écran pour souffler les bougies. Sur iPhone, le son ne peut démarrer
   // qu'au moment où le doigt quitte l'écran : on attend donc la fin du toucher.
-  const onTap = () => {
+  const onTap = (e) => {
     AudioSys.init();
+    if (e && e.target && e.target.closest && e.target.closest('#tkb')) return;
     if (state === ST_TITLE && TOUCH_ONLY) blowCandles();
   };
   window.addEventListener('touchend', onTap, { passive: true });
@@ -2653,7 +2660,8 @@ if (ANNIV && typeof window !== 'undefined') {
 }
 
 // ===================== SAISIE =====================
-window.addEventListener('keydown', (e) => {
+// une touche du vrai clavier ou du clavier tactile (même objet : key, code, preventDefault)
+function onKey(e) {
   AudioSys.init();
 
   // réglages sur les touches chiffrées (repérées par leur position, donc aussi en AZERTY et sur Mac,
@@ -2726,7 +2734,8 @@ window.addEventListener('keydown', (e) => {
   if (!/[A-Z\-']/.test(ch)) return;
   e.preventDefault();
   typeChar(ch);
-});
+}
+window.addEventListener('keydown', onKey);
 
 function typeChar(ch) {
   if (activeWord && (activeWord.dying || words.indexOf(activeWord) === -1)) activeWord = null;
@@ -3815,19 +3824,100 @@ const TITLE_RULES = [
 // téléphone ou tablette sans souris : il faut un clavier physique pour jouer
 const TOUCH_ONLY = window.matchMedia && matchMedia('(hover: none) and (pointer: coarse)').matches;
 
+// ===================== MODE TACTILE (téléphones et tablettes) =====================
+// Un clavier en HTML sous la zone de jeu : de vraies touches, réactives et faciles à viser.
+const touchPanel = TOUCH_ONLY ? buildTouchPanel() : null;
+
+function vkey(key, code) { onKey({ key, code: code || '', preventDefault() {} }); }
+
+function buildTouchPanel() {
+  const root = document.createElement('div');
+  root.id = 'tkb';
+  document.body.appendChild(root);
+  const mk = (parent, label, key, code, cls) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = label;
+    b.className = 'tk ' + (cls || '');
+    b.addEventListener('touchstart', (e) => { e.preventDefault(); b.classList.add('down'); vkey(key, code); }, { passive: false });
+    // le son ne peut démarrer sur iPhone qu'à la fin d'un toucher
+    b.addEventListener('touchend', (e) => { e.preventDefault(); b.classList.remove('down'); AudioSys.init(); }, { passive: false });
+    b.addEventListener('mousedown', (e) => { e.preventDefault(); vkey(key, code); });
+    parent.appendChild(b);
+    return b;
+  };
+  const play = document.createElement('div');
+  play.className = 'tk-play';
+  root._letters = {};
+  KB_LAYOUTS[kbPref.layout].forEach((row) => {
+    const div = document.createElement('div');
+    div.className = 'tk-row';
+    for (let c = 0; c < row.length; c++) root._letters[row[c]] = mk(div, row[c], row[c].toLowerCase(), 'Key' + row[c], 'f' + COL_FINGER[c]);
+    play.appendChild(div);
+  });
+  const extra = document.createElement('div');
+  extra.className = 'tk-row';
+  mk(extra, '⏪ REMONTE-TEMPS', '1', 'Digit1', 'wide');
+  mk(extra, 'BOOMERANG', '2', 'Digit2', 'wide');
+  mk(extra, 'PAUSE', 'Escape', 'Escape', 'pause');
+  play.appendChild(extra);
+  const menu = document.createElement('div');
+  menu.className = 'tk-row tk-menu';
+  root._mb = {
+    left: mk(menu, '◀', 'ArrowLeft', 'ArrowLeft'), up: mk(menu, '▲', 'ArrowUp', 'ArrowUp'),
+    down: mk(menu, '▼', 'ArrowDown', 'ArrowDown'), right: mk(menu, '▶', 'ArrowRight', 'ArrowRight'),
+    ok: mk(menu, 'JOUER', 'Enter', 'Enter', 'ok'), back: mk(menu, 'RETOUR', 'Escape', 'Escape'),
+    shop: mk(menu, 'BOUTIQUE', 'b', 'KeyB'),
+  };
+  root.appendChild(play);
+  root.appendChild(menu);
+  root._play = play;
+  root._menu = menu;
+  root._view = '';
+  return root;
+}
+
+// boutons utiles selon l'écran, et la prochaine lettre à taper allumée
+function updateTouchPanel() {
+  if (!touchPanel) return;
+  const T = touchPanel, mb = T._mb;
+  const playing = state === ST_PLAY || state === ST_BREAK;
+  const view = playing ? 'play' : 'menu|' + state;
+  if (view !== T._view) {
+    T._view = view;
+    T._play.style.display = playing ? '' : 'none';
+    T._menu.style.display = playing ? 'none' : '';
+    const show = (b, on) => { b.style.display = on ? '' : 'none'; };
+    const shop = state === ST_SHOP;
+    show(mb.up, shop);
+    show(mb.down, shop);
+    show(mb.left, state === ST_TITLE || shop);
+    show(mb.right, state === ST_TITLE || shop);
+    show(mb.back, shop || state === ST_OVER);
+    show(mb.shop, state === ST_TITLE);
+    mb.ok.textContent = state === ST_PAUSE ? 'REPRENDRE' : state === ST_OVER ? 'REJOUER' : shop ? 'OK' : 'JOUER';
+  }
+  const hint = state === ST_PLAY ? nextKeyHint() : null;
+  if (hint !== T._hint) {
+    if (T._hint && T._letters[T._hint]) T._letters[T._hint].classList.remove('hint');
+    if (hint && T._letters[hint]) T._letters[hint].classList.add('hint');
+    T._hint = hint;
+  }
+}
+
 function drawTouchNotice() {
   if (ANNIV) { drawTouchNoticeAnniv(); return; }
   const s = Math.max(3, Math.min(9, Math.floor((W - 24) / 62)));
   const y = Math.round(H * 0.18);
   drawPixelTextOutline(ctx, 'TYPE', W / 2 - s, y, s, '#ffe97a', '#101528', 'right');
   drawPixelTextOutline(ctx, 'RIDER', W / 2 + s, y, s, '#7ad9ff', '#101528', 'left');
-  const lines = ['TYPERIDER SE JOUE', 'SUR ORDINATEUR,', 'AVEC UN VRAI CLAVIER.', '', 'A BIENTOT SUR PC OU MAC !'];
+  const lines = ['TAPE LES MOTS QUI TOMBENT', 'AVEC LE CLAVIER EN BAS', '', '< ' + DIFFS[diffIndex].name + ' >', '', 'TOUCHE JOUER'];
   const ts = W < 420 ? 2 : 3;
   let ly = y + 7 * s + 40;
   ctx.fillStyle = 'rgba(8,12,28,0.72)';
   ctx.fillRect(12, ly - 18, W - 24, lines.length * (7 * ts + 14) + 24);
   for (const l of lines) {
-    drawPixelTextShadow(ctx, l, W / 2, ly, ts, l.startsWith('A BIENTOT') ? '#7affc0' : '#f2f5ff', 'center');
+    drawPixelTextShadow(ctx, l, W / 2, ly, ts, l === 'TOUCHE JOUER' ? '#7affc0' : l.startsWith('<') ? DIFFS[diffIndex].color : '#f2f5ff', 'center');
     ly += 7 * ts + 14;
   }
 }
@@ -3873,7 +3963,7 @@ function drawTouchNoticeAnniv() {
     const msgLines = msg ? wrap(msg, 2) : [];
     const tapLines = candlesLit ? ['TOUCHE L\'ECRAN POUR', 'SOUFFLER LES BOUGIES'] : ['FAIS UN VOEU !'];
     const h = head.length * (7 * s1 + 12) + 4 + 7 * sn + 20 + msgLines.length * 22 + (msg ? 10 : 0)
-      + tapLines.length * (7 * ts + 10) + (withPlay ? 12 + 2 * 22 : 0);
+      + tapLines.length * (7 * ts + 10) + (withPlay ? 12 + 7 * 3 + 12 + 22 : 0);
     return { head, s1, sn, ts, msgLines, tapLines, withPlay, h };
   };
   const options = [];
@@ -3903,11 +3993,12 @@ function drawTouchNoticeAnniv() {
     y += 7 * L.ts + 10;
   }
   if (L.withPlay) {
+    // difficulté (boutons ◀ ▶ du clavier tactile) et invitation à jouer
+    const d = DIFFS[diffIndex];
     y += 12;
-    for (const l of ['POUR JOUER : UN ORDINATEUR', 'AVEC UN CLAVIER']) {
-      drawPixelTextShadow(ctx, l, W / 2, y, 2, '#9fb3e8', 'center');
-      y += 22;
-    }
+    drawPixelTextShadow(ctx, '< ' + d.name + ' >', W / 2, y, 3, d.color, 'center');
+    y += 7 * 3 + 12;
+    drawPixelTextShadow(ctx, 'TOUCHE JOUER POUR COMMENCER', W / 2, y, 2, '#9fb3e8', 'center');
   }
 }
 
@@ -4064,11 +4155,12 @@ function frame(t) {
   let dt = Math.min(0.05, (t - lastT) / 1000 || 0.016);
   lastT = t;
   // certains navigateurs changent la taille (onglet caché, zoom) sans prévenir
-  if (Math.max(1, innerWidth) !== W || Math.max(1, innerHeight) !== H) resize();
+  if (Math.max(1, innerWidth) !== W || viewH() !== H) resize();
   if (hitStop > 0) { hitStop -= dt; dt *= 0.08; }
   if (state !== ST_PAUSE) update(dt);
   draw(dt);
   present();
+  updateTouchPanel();
   requestAnimationFrame(frame);
 }
 
@@ -4110,7 +4202,7 @@ if (/[?&]debug\b/.test(location.search)) window.__TR = {
   get weather() { return weather; },
   step(sec) {
     const dt = 1 / 60;
-    if (Math.max(1, innerWidth) !== W || Math.max(1, innerHeight) !== H) resize();
+    if (Math.max(1, innerWidth) !== W || viewH() !== H) resize();
     for (let i = 0; i < sec * 60; i++) { if (state !== ST_PAUSE) update(dt); draw(dt); }
     present();
   },

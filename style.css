@@ -33,3 +33,94 @@ canvas {
 #ui {
   pointer-events: none;
 }
+
+/* ---------- clavier tactile (téléphones et tablettes) ---------- */
+#tkb {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
+  background: #0b1022;
+  border-top: 2px solid #26304f;
+  touch-action: none;
+}
+
+.tk-play {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tk-row {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+}
+
+.tk {
+  flex: 1 1 0;
+  max-width: 64px;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  border-bottom: 3px solid #10162a;
+  border-radius: 7px;
+  background: #26304f;
+  color: #f2f5ff;
+  font: bold 20px ui-monospace, Menlo, Consolas, monospace;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* une couleur par doigt, comme le clavier dessiné dans le jeu */
+.tk.f0, .tk.f7 { border-bottom-color: #ff6b9a; }
+.tk.f1, .tk.f6 { border-bottom-color: #ffb347; }
+.tk.f2, .tk.f5 { border-bottom-color: #ffe97a; }
+.tk.f3 { border-bottom-color: #7affc0; }
+.tk.f4 { border-bottom-color: #7ad9ff; }
+
+.tk.hint {
+  background: #ffe97a;
+  color: #101528;
+}
+
+.tk.down {
+  transform: translateY(2px);
+  filter: brightness(1.35);
+}
+
+.tk.wide {
+  flex: 2 1 0;
+  max-width: none;
+  font-size: 13px;
+}
+
+.tk.pause {
+  max-width: 90px;
+  font-size: 13px;
+}
+
+.tk-menu .tk {
+  max-width: none;
+  height: 54px;
+  font-size: 16px;
+}
+
+.tk.ok {
+  flex: 2 1 0;
+  background: #2e8f5a;
+}
+
+/* téléphone tourné en paysage : touches plus basses pour garder de la place au jeu */
+@media (max-height: 500px) {
+  #tkb { gap: 4px; padding-top: 4px; }
+  .tk-play { gap: 4px; }
+  .tk { height: 34px; font-size: 16px; }
+  .tk-menu .tk { height: 40px; }
+}
