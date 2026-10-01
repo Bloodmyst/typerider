@@ -1742,12 +1742,9 @@ function saveMeta() {
   saveJSON('typerider.garage', garageMax);
 }
 const fxActive = (id) => owned.includes(id) && fxOn.includes(id);
-if (!equipped.char) equipped.char = ANNIV ? 'kimlu_cine' : 'rider';
-// essai « style Replaced » : on montre la nouvelle Kimlu une première fois (le choix reste libre dans PERSO)
-if (ANNIV && equipped.char === 'kimlu' && !loadJSON('typerider.cine', false)) {
-  equipped.char = 'kimlu_cine';
-  saveJSON('typerider.cine', true);
-}
+// tous les personnages sont en haute définition : l'ancien identifiant « kimlu_cine » devient « kimlu »
+if (equipped.char === 'kimlu_cine') equipped.char = 'kimlu';
+if (!equipped.char) equipped.char = ANNIV ? 'kimlu' : 'rider';
 
 // cadeau d'anniversaire : offert une seule fois par prénom
 let annivGift = 0;
@@ -1758,7 +1755,7 @@ if (ANNIV) {
     credits += annivGift;
     for (const id of ['skin_rose', 'acc_fete', 'fx_confettis']) if (!owned.includes(id)) owned.push(id);
     if (!fxOn.includes('fx_confettis')) fxOn.push('fx_confettis');
-    Object.assign(equipped, { skin: 'skin_rose', acc: 'acc_fete', char: 'kimlu_cine' });
+    Object.assign(equipped, { skin: 'skin_rose', acc: 'acc_fete', char: 'kimlu' });
     saveMeta();
     saveJSON(key, true);
   }
@@ -1766,8 +1763,7 @@ if (ANNIV) {
 
 // ===================== BOUTIQUE =====================
 const PILOTS = [
-  { id: 'kimlu_cine', name: 'KIMLU CINEMA' },
-  { id: 'kimlu', name: 'KIMLU CLASSIQUE' },
+  { id: 'kimlu', name: 'KIMLU' },
   { id: 'rider', name: 'RIDER' },
 ];
 
@@ -1973,12 +1969,10 @@ function displayTier() {
   if (state === ST_SHOP) return garageSel + 1;
   return state === ST_TITLE ? garageMax : vehicleTier;
 }
-// hauteur du pilote à l'écran, en pixels (la version haute définition est un peu plus grande)
-function charPx(tier) {
-  const fine = tier === 1 && equipped.char === 'kimlu_cine';
-  return V.height(tier, equipped.char) * (fine ? 2 * Math.ceil(vu() / 2) : vu());
-}
-function vu() { return Math.max(2, Math.round(PX * 0.9)); } // taille d'une cellule de véhicule
+// hauteur du véhicule et de son pilote à l'écran, en pixels
+function charPx(tier) { return V.height(tier, equipped.char) * vu(); }
+// taille d'une cellule de véhicule : toujours paire, pour que les pixels fins (une demi-cellule) restent nets
+function vu() { return Math.max(2, 2 * Math.ceil(PX * 0.45)); }
 function groundSpeedPx() { return 34 * worldSpeed * PX; }
 
 function startEvolution(from, to) {
@@ -2531,7 +2525,7 @@ function blowProgress() {
 function drawCake() {
   const u = vu();
   const def = V.list[garageMax - 1];
-  const extra = garageMax === 1 && equipped.char === 'kimlu_cine' ? 8 : 0; // la grande Kimlu tend le bras plus loin
+  const extra = garageMax === 1 ? 8 : 0; // la grande Kimlu tend le bras plus loin
   const cx = Math.round(turret.x + (def.halfW + 22 + extra) * u), base = turret.y;
   const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(cx + x * u, base + y * u, w * u, h * u); };
   const ink = '#141a2e';

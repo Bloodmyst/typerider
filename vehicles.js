@@ -65,125 +65,6 @@ function palette(skinId, jacket, char) {
   return P;
 }
 
-// ---------- sprites du pilote (sans contour : il est ajouté automatiquement) ----------
-const SPRITES = {
-  torso: [
-    '....hhhh....',
-    '...hhhhhhh..',
-    '..hhhhhhhhh.',
-    '..hhhkkkkkk.',
-    '..hhkkkkokk.',
-    '..hkkkkkkkkK',
-    '...kkkkkkkk.',
-    '....KKkkk...',
-    '..aajjjjjj..',
-    '.aaajjJJJjj.',
-    '.aaajjjjjjj.',
-    '.aAajjjjjjj.',
-    '.aaajjjjjqq.',
-    '..aa.qqqqqq.',
-  ],
-  helmet: [
-    '....mmmm....',
-    '...mmmmmmm..',
-    '..mmmmmmmmm.',
-    '..mmlmgggggg',
-    '..mmmgWggggg',
-    '..mmmgggggg.',
-    '...mmmmmmmd.',
-    '....SSkkk...',
-    '..aajjjjjj..',
-    '.aaajjJJJjj.',
-    '.aaajjjjjjj.',
-    '.aAajjjjjjj.',
-    '.aaajjjjjqq.',
-    '..aa.qqqqqq.',
-  ],
-  // Kimlu : mêmes dimensions et mêmes points d'attache que le pilote d'origine
-  kimluTall: [
-    '....uuuu....',
-    '...uuuuuUY..',
-    '..uuuuuuuUY.',
-    '..uuuuuuukR.',
-    '..uuuuukokR.',
-    '..uuuukkkkkR',
-    '..uuuuEkkeK.',
-    '..uuuuzKkK..',
-    '..uuuuuKk...',
-    '.uuuuujjjkR.',
-    '.uuuuqjjjjJ.',
-    '.uuuuqjjqjJ.',
-    '.uuuuqjjqjJ.',
-    '..uuuqjjqjJ.',
-    '..uuuqjjjJJ.',
-    '...uuqqjjjJ.',
-    '....qQQQQq..',
-    '....qjjjjjJ.',
-    '...qqjqjjqjJ',
-    '...qjjqjjqjJ',
-    '..qqjjqjjqjJ',
-    '..qjjjqjjjqJ',
-    '..QQqqqqqqqQ',
-  ],
-  torsoK: [
-    '...uuuuu....',
-    '..uuuuuuuu..',
-    '.uuuuuuuUuu.',
-    '.uuuuuuukkk.',
-    '.uuukkkkokk.',
-    '.uuukkkkkkkK',
-    'uuuuEkkkkee.',
-    'uuuuzKkkk...',
-    'uuukjjjjjj..',
-    'uuukjjJJJjj.',
-    'uuujjjjjjjj.',
-    '.uuqjjjjjjj.',
-    '..uqjjjjjjqq',
-    '...qqqqqqqqq',
-  ],
-  helmetK: [
-    '....mmmm....',
-    '...mmmmmmm..',
-    '..mmmmmmmmm.',
-    '..mmlmgggggg',
-    '..mmmgWggggg',
-    '.ummmgggggg.',
-    'uuummmmmmmd.',
-    'uuuuSSkkk...',
-    'uuukjjjjjj..',
-    'uuukjjJJJjj.',
-    'uuujjjjjjjj.',
-    '.uuqjjjjjjj.',
-    '..uqjjjjjjqq',
-    '...qqqqqqqqq',
-  ],
-};
-
-// sprite du pilote choisi (o.char === 'kimlu' → variante K)
-function pilot(o, base) { return o.char && o.char.startsWith('kimlu') ? base + 'K' : base; }
-
-const sprCache = {};
-function sprite(name, P, key) {
-  const ck = name + '|' + key;
-  let c = sprCache[ck];
-  if (c) return c;
-  const rows = SPRITES[name];
-  c = document.createElement('canvas');
-  c.width = rows[0].length;
-  c.height = rows.length;
-  const sg = c.getContext('2d');
-  for (let y = 0; y < rows.length; y++) {
-    for (let x = 0; x < rows[y].length; x++) {
-      const ch = rows[y][x];
-      if (ch === '.') continue;
-      sg.fillStyle = P[ch];
-      sg.fillRect(x, y, 1, 1);
-    }
-  }
-  sprCache[ck] = c;
-  return c;
-}
-
 // ---------- primitives (coordonnées en cellules) ----------
 function R(col, x, y, w, h) {
   g.fillStyle = col;
@@ -271,23 +152,6 @@ function leg(col, shoe, hx, hy, fx, fy, L1, L2) {
   R(shoe, sx - 1, sy - 1, 3, 1);
 }
 
-function legBoot(P, hx, hy, fx, fy, L1, L2) {
-  let dx = fx - hx, dy = fy - hy, d = Math.hypot(dx, dy);
-  const md = L1 + L2 - 0.05;
-  if (d > md) { fx = hx + dx / d * md; fy = hy + dy / d * md; d = md; }
-  d = Math.max(0.1, d);
-  const a = Math.atan2(fy - hy, fx - hx);
-  const cb = Math.max(-1, Math.min(1, (L1 * L1 + d * d - L2 * L2) / (2 * L1 * d)));
-  const ka = a - Math.acos(cb);
-  const kx = hx + Math.cos(ka) * L1, ky = hy + Math.sin(ka) * L1;
-  line(P.p, hx, hy, kx, ky, 2);
-  line(P.B, kx, ky, fx, fy, 2);
-  line(P.b, kx + 1, ky, (kx + fx) / 2 + 1, (ky + fy) / 2, 1);
-  const sx = Math.round(fx), sy = Math.round(fy);
-  R(P.B, sx - 1, sy - 1, 4, 1);
-  R(P.t, sx - 1, sy, 5, 1);
-}
-
 // arme orientée : suite de segments [longueur, épaisseur, couleur, décalage, avance]
 function weapon(segs, P, px, py, ang, recoil) {
   const cx = Math.cos(ang), sy = Math.sin(ang), nx = -sy, ny = cx;
@@ -358,31 +222,7 @@ const VEHICLES = [
     id: 'marche', name: 'A PIED', weapon: 'LANCE-PIERRE', jacket: 'skin',
     speed: 0.35, proj: 'caillou', kick: 0.6, halfW: 7, h: 23,
     segs: [[2.5, 2, 'j'], [1.5, 2, 'k'], [2.5, 1, 'b'], [2, 1, 'b', -1, false], [2, 1, 'b', 1], [0.5, 3, 'r']],
-    segsCine: [[3, 2, 'k'], [1, 2, 'K'], [2.5, 1, 'b'], [2, 1, 'b', -1, false], [2, 1, 'b', 1], [0.5, 3, 'r']],
-    draw(P, o) {
-      if (o.char === 'kimlu_cine') {
-        // grande foulée, léger balancement, jambe arrière plus sombre
-        const ph = o.travel * 0.36;
-        const by = -Math.round(Math.abs(Math.sin(ph)));
-        const f1x = 1.5 + 4.5 * Math.cos(ph), f1y = -2 + Math.min(0, Math.sin(ph)) * 3.5;
-        const f2x = 0.5 + 4.5 * Math.cos(ph + Math.PI), f2y = -2 + Math.min(0, Math.sin(ph + Math.PI)) * 3.5;
-        const back = Object.assign({}, P, { p: P.P, B: darken(P.B, 0.35), b: P.B });
-        legBoot(back, 0, -19 + by, f2x, f2y, 9, 9);
-        legBoot(P, 1.5, -19 + by, f1x, f1y, 9, 9);
-        g.drawImage(sprite('kimluTall', P, o.skin + o.char), -6, -38 + by);
-        return { mount: [3.5, -28 + by], head: [1.5, -38 + by], back: [-4, -29 + by],
-                 contacts: [[f1x, 0], [f2x, 0]] };
-      }
-      const ph = o.travel * 0.52;
-      const by = -Math.round(Math.abs(Math.sin(ph)));
-      const f1x = 3 * Math.cos(ph), f1y = -2 + Math.min(0, Math.sin(ph)) * 2.5;
-      const f2x = 3 * Math.cos(ph + Math.PI), f2y = -2 + Math.min(0, Math.sin(ph + Math.PI)) * 2.5;
-      leg(P.P, P.B, 0, -9 + by, f2x, f2y, 4, 4.8);
-      g.drawImage(sprite(pilot(o, 'torso'), P, o.skin + 'skin'), -6, -23 + by);
-      leg(P.p, P.B, 1, -9 + by, f1x, f1y, 4, 4.8);
-      return { mount: [3.5, -13.5 + by], head: [0.5, -23 + by], back: [-4, -15 + by],
-               contacts: [[f1x, 0], [f2x, 0]] };
-    },
+    // dessiné en haute définition par renderWalker
   },
   {
     id: 'trottinette', name: 'TROTTINETTE', weapon: 'PISTOLET A EAU', jacket: 'skin',
@@ -401,7 +241,7 @@ const VEHICLES = [
       R(P.m, -8, -6, 14, 1);
       R(P.d, -8, -5, 14, 1);
       R(P.S, -10, -6, 2, 1);
-      g.drawImage(sprite(pilot(o, 'torso'), P, o.skin + 'skin'), -8, -29);
+      drawPilot(P, o, 'torso', -8, -29);
       leg(P.p, P.B, -1, -15, 0, -9, 3.4, 3.6);
       line(P.j, -1, -19, 1, -21, 2);
       return { mount: [1.5, -19.5], head: [-1.5, -29], back: [-6, -21], contacts: [[-6, 0], [6, 0]] };
@@ -431,7 +271,7 @@ const VEHICLES = [
       R(P.a, 1, -17, 2, 1);
       R(P.B, -6, -14, 5, 1);
       disc(P.S, -0.5, -4.5, 1.6);
-      g.drawImage(sprite(pilot(o, 'torso'), P, o.skin + 'skin'), -9, -29);
+      drawPilot(P, o, 'torso', -9, -29);
       leg(P.p, P.B, -2, -15, p1x, p1y - 1, 5, 5.6);
       line(P.j, -2, -19, 2, -17, 2);
       return { mount: [0.5, -19.5], head: [-2.5, -29], back: [-7, -21], contacts: [[-8, 0], [8, 0]] };
@@ -445,7 +285,7 @@ const VEHICLES = [
       const ang = o.travel / 4;
       const y = Math.round(Math.sin(o.travel * 0.15) * 0.6);
       R(P.B, -11, -15 + y, 2, 5);
-      g.drawImage(sprite(pilot(o, 'torso'), P, o.skin + 'cream'), -8, -21 + y);
+      drawPilot(P, o, 'torso', -8, -21 + y);
       R(P.m, -15, -12 + y, 8, 2);
       R(P.l, -15, -12 + y, 8, 1);
       R(P.m, -16, -10 + y, 32, 6);
@@ -490,7 +330,7 @@ const VEHICLES = [
       R(P.B, -8, -12, 7, 2);
       R(P.m, -11, -13, 4, 2);
       R(P.r, -12, -13, 1, 1);
-      g.drawImage(sprite(pilot(o, 'helmet'), P, o.skin + 'cream'), -10, -27);
+      drawPilot(P, o, 'helmet', -10, -27);
       R(P.m, -2, -13, 8, 3);
       R(P.l, -1, -13, 6, 1);
       R(P.a, -1, -12, 6, 1);
@@ -511,7 +351,7 @@ const VEHICLES = [
     draw(P, o) {
       const ang = o.travel / 5.5;
       const y = Math.round(Math.sin(o.travel * 0.21) * 0.9);
-      g.drawImage(sprite(pilot(o, 'helmet'), P, o.skin + 'cream'), -8, -25 + y);
+      drawPilot(P, o, 'helmet', -8, -25 + y);
       R(P.S, -15, -13 + y, 4, 5);
       R(P.T, -15, -12 + y, 4, 1);
       R(P.T, -15, -10 + y, 4, 1);
@@ -542,7 +382,7 @@ const VEHICLES = [
     draw(P, o) {
       const ang = o.travel / 5.5;
       const y = Math.round(Math.sin(o.travel * 0.17) * 0.7);
-      g.drawImage(sprite(pilot(o, 'torso'), P, o.skin + 'cream'), -7, -28 + y);
+      drawPilot(P, o, 'torso', -7, -28 + y);
       R(P.m, -16, -14 + y, 32, 8);
       R(P.l, -16, -14 + y, 32, 1);
       R(P.d, -16, -7 + y, 32, 1);
@@ -575,7 +415,7 @@ const VEHICLES = [
     segs: [[3, 4, 'S'], [2, 2, 'S'], [1, 3, 'g'], [2, 2, 'S'], [1, 3, 'g'], [1, 2, 'e']],
     draw(P, o) {
       const ang = o.travel / 4.5;
-      g.drawImage(sprite(pilot(o, 'torso'), P, o.skin + 'cream'), -8, -28);
+      drawPilot(P, o, 'torso', -8, -28);
       R(P.S, -11, -22, 3, 2);
       R(P.m, -9, -20, 14, 5);
       R(P.l, -9, -20, 14, 1);
@@ -604,7 +444,7 @@ const VEHICLES = [
     segs: [[4, 5, 'S'], [9, 2, 'S'], [2, 4, 'T']],
     draw(P, o) {
       const tr = o.travel;
-      g.drawImage(sprite(pilot(o, 'torso'), P, o.skin + 'cream'), -8, -27);
+      drawPilot(P, o, 'torso', -8, -27);
       R(P.S, -14, -21, 3, 2);
       R(P.m, -11, -19, 20, 6);
       R(P.l, -11, -19, 20, 1);
@@ -643,10 +483,9 @@ for (const v of VEHICLES) {
   v.muzzle = v.segs.reduce((s, sg) => s + (sg[4] === false ? 0 : sg[0]), 0);
 }
 
-/* Dessine le véhicule `tier` (1..9) et renvoie sa géométrie + le canvas.
-   o = { t, travel, angle, recoil, skin, acc, white (0..1), dark (silhouette) } */
-// ---------- Kimlu « cinéma » en haute définition (2 pixels fins par cellule) ----------
-// Tout est dessiné en pixels fins : profil du visage, plis de la robe, jambes et bottes.
+// ---------- Personnages en haute définition (2 pixels fins par cellule) ----------
+// Les véhicules sont dessinés à l'échelle des cellules (x2) ; les personnages, leurs bras et
+// leurs accessoires en pixels fins : profil du visage, plis des vêtements, jambes et chaussures.
 const cvF = document.createElement('canvas');
 cvF.width = CW * 2; cvF.height = CH * 2;
 const gF = cvF.getContext('2d');
@@ -654,6 +493,13 @@ const outF = document.createElement('canvas');
 outF.width = CW * 2; outF.height = CH * 2;
 const ogF = outF.getContext('2d');
 
+function lighten(hex, k) {
+  const n = parseInt(hex.slice(1), 16);
+  const f = (v) => Math.round(v + (255 - v) * k);
+  return '#' + ((1 << 24) | (f(n >> 16) << 16) | (f((n >> 8) & 255) << 8) | f(n & 255)).toString(16).slice(1);
+}
+
+// couleurs fines de Kimlu (sa robe bleu canard ne change pas avec les couleurs achetées)
 const FINE = {
   u: '#160e10', U: '#2a1b1c', H: '#4a332f', Y: '#7a5040',          // cheveux : ombre, base, reflet, contour chaud
   k: '#dba27e', K: '#b97f60', L: '#8f5c46', R: '#f6cfa8',          // peau : base, ombre, ombre profonde, contour
@@ -662,6 +508,25 @@ const FINE = {
   E: '#e8c050', z: '#38c7b8',                                        // boucle d'oreille
   b: '#7a4f2e', r: '#c23a3a',                                        // lance-pierre
 };
+
+// chaque personnage : coiffure, tenue, accessoires portés en permanence
+const LOOKS = {
+  kimlu: { hair: 'long', outfit: 'dress', earring: true, pack: false, sleeve: false },
+  rider: { hair: 'short', outfit: 'jacket', earring: false, pack: true, sleeve: true },
+};
+const charId = (c) => (c && c.startsWith('kimlu') ? 'kimlu' : 'rider');
+
+function lookColors(id, P) {
+  const helmetCols = { v: P.m, V: P.d, W: P.l, n: P.g, S: P.S, a: P.a, A: P.A };
+  if (id === 'kimlu') return Object.assign({}, FINE, helmetCols);
+  // Rider : cheveux châtains courts, veste aux couleurs achetées, sac à dos
+  return Object.assign({}, FINE, helmetCols, {
+    u: '#2e1a12', U: '#5a3522', H: '#7d4c30', Y: '#a8744e',
+    k: '#efbf98', K: '#cf9470', L: '#a8704f', R: '#ffe2c4', m: '#c98676',
+    j: P.j, J: P.J, q: P.q, Q: darken(P.q, 0.35), Z: lighten(P.J, 0.45),
+    p: P.p, P: P.P,
+  });
+}
 
 // tête de profil (vers la droite), lignes de 24 pixels fins
 const FINE_HEAD = [
@@ -682,60 +547,119 @@ const FINE_HEAD = [
   '....uUUUUUUUUUuKkkR.....',
 ];
 
-// silhouette du corps ligne par ligne : bord arrière et bord avant de la robe
-function fineBodyEdges(r) {
+// tête casquée (moto, buggy) : coque aux couleurs achetées, visière lumineuse, jugulaire
+const FINE_HEAD_HELMET = [
+  '........vvvvvv..........',
+  '......vvvvvvvvvv........',
+  '.....vvWvvvvvvvvv.......',
+  '....vvWWvvvvvvvvvv......',
+  '....vvvvvvvvvvvnnnn.....',
+  '....vvvvvvvvvvnnnnnn....',
+  '....vvvvvvvvvvnnnWnnn...',
+  '....vvvvvvvvvvnnnnnnn...',
+  '....VvvvvvvvvvvnnnnnV...',
+  '.....VvvvvvvvvvvvvvV....',
+  '......VVvvvvvvvvVkkR....',
+  '.......SSSSSSSSKkkkR....',
+  '.............SKkkkR.....',
+  '..............Kkk.......',
+  '..............KkkR......',
+];
+
+function headRows(look, helmet) {
+  if (helmet) return FINE_HEAD_HELMET;
+  let rows = FINE_HEAD;
+  if (!look.earring) rows = rows.map(r => r.replace(/[Ez]/g, 'K'));
+  if (look.hair === 'short') {
+    // cheveux courts : rien sous la nuque
+    rows = rows.map((r, i) => (i < 12 ? r : r.split('').map((c, x) => ('uUH'.includes(c) ? (x >= 12 ? 'K' : '.') : c)).join('')));
+  }
+  return rows;
+}
+
+// silhouette du corps ligne par ligne : bord arrière et bord avant
+function fineBodyEdges(r, outfit) {
   if (r <= 16) return [10, 18];             // épaules
   if (r <= 22) return [10, 19];             // poitrine
   if (r <= 27) return [11, 17];             // taille qui s'affine
   if (r === 28) return [11, 16];            // taille
-  if (r <= 34) return [10 - (r > 31 ? 1 : 0), 17 + (r > 31 ? 1 : 0)]; // hanches
+  if (r <= 34 || outfit !== 'dress') return [10 - (r > 31 ? 1 : 0), 17 + (r > 31 ? 1 : 0)]; // hanches
   const t = (r - 35) / 15;                  // jupe évasée jusqu'aux genoux
   return [Math.round(9 - t * 3), Math.round(18 + t * 3)];
 }
 
-let fineSprite = null;
-function buildFineSprite() {
-  const W2 = 24, H2 = 51;
+function dressColor(r, i, xb, xf) {
+  if (r <= 19 && i >= 14 + (r - 15)) return i === xf ? 'R' : i === 14 + (r - 15) ? 'K' : 'k'; // épaule nue
+  if (r === 28) return i === xf ? 'Z' : 'Q';                       // taille froncée
+  if (i === xf) return 'Z';                                         // contour de lumière
+  if (i === xf - 1 || (r > 34 && i === xf - 2 && r % 2)) return 'J';
+  if (i <= xb + 1) return r > 34 && i === xb ? 'Q' : 'q';          // côté ombre
+  if (r > 34) {
+    const d = i - xb;
+    if (d === 4 || d === 8 || d === 11) return 'q';                 // plis de la jupe
+    if (d === 5 || d === 9) return 'J';
+  }
+  if (r === 22 && i > xb + 1 && i < xf - 1) return 'q';            // ombre sous la poitrine
+  if (i === xb + 2 && (i + r) % 2) return 'q';                     // dégradé tramé
+  return 'j';
+}
+
+function jacketColor(r, i, xb, xf) {
+  if (r > 34) return i === xf ? 'p' : i <= xb + 1 ? 'P' : 'p';     // haut du pantalon
+  if (r === 15) return i >= 15 ? 'J' : 'j';                        // col
+  if (i === xf) return 'Z';
+  if (i === xf - 1) return 'J';
+  if (i <= xb + 1) return 'q';
+  if (i === xf - 4 && r > 16 && r < 33) return 'q';                // fermeture éclair
+  if (r >= 32) return 'q';                                          // bas de la veste
+  if (i === xb + 2 && (i + r) % 2) return 'q';
+  return 'j';
+}
+
+// poses : 'stand' (à pied, jusqu'aux hanches ou à l'ourlet), 'seat' (buste), 'helmet' (buste casqué)
+const figCache = new WeakMap();
+function figure(char, pose, P) {
+  let byP = figCache.get(P);
+  if (!byP) { byP = {}; figCache.set(P, byP); }
+  const key = char + '|' + pose;
+  if (byP[key]) return byP[key];
+  const id = charId(char), look = LOOKS[id], C = lookColors(id, P);
+  const helmet = pose === 'helmet';
+  const H2 = pose === 'stand' ? (look.outfit === 'dress' ? 51 : 41) : 28;
   const c = document.createElement('canvas');
-  c.width = W2; c.height = H2;
+  c.width = 24; c.height = H2;
   const x = c.getContext('2d');
-  const px = (col, cx, cy) => { x.fillStyle = FINE[col] || col; x.fillRect(cx, cy, 1, 1); };
-  FINE_HEAD.forEach((row, r) => { for (let i = 0; i < row.length; i++) if (row[i] !== '.') px(row[i], i, r); });
+  const px = (col, cx, cy) => { x.fillStyle = C[col] || col; x.fillRect(cx, cy, 1, 1); };
+  headRows(look, helmet).forEach((row, r) => { for (let i = 0; i < row.length; i++) if (row[i] !== '.') px(row[i], i, r); });
+  if (helmet && look.hair === 'long') {
+    for (let r = 9; r < 15; r++) for (let i = 3; i <= 7; i++) px(i === 3 ? 'u' : 'U', i, r); // cheveux sous le casque
+  }
   for (let r = 15; r < H2; r++) {
-    // longs cheveux qui tombent dans le dos, avec un reflet
-    if (r <= 34) {
+    if (look.hair === 'long' && r <= 34) {
+      // longs cheveux qui tombent dans le dos, avec un reflet
       const h0 = r < 18 ? 4 : r < 28 ? 3 : 4 + Math.floor((r - 28) / 2);
       const h1 = r < 28 ? 10 : 10 - Math.floor((r - 28) / 3);
       for (let i = h0; i <= h1; i++) px(i === h0 ? 'u' : (i === h0 + 2 && r < 30 ? 'H' : 'U'), i, r);
     }
-    const [xb, xf] = fineBodyEdges(r);
-    for (let i = Math.max(xb, r <= 34 ? 11 : xb); i <= xf; i++) {
-      let col = 'j';
-      if (r <= 19 && i >= 14 + (r - 15)) {
-        // décolleté asymétrique : épaule et haut du buste nus côté face
-        col = i === xf ? 'R' : i === 14 + (r - 15) ? 'K' : 'k';
-      } else if (r === 28) {
-        col = i === xf ? 'Z' : 'Q';                       // taille froncée
-      } else if (i === xf) {
-        col = 'Z';                                         // contour de lumière
-      } else if (i === xf - 1 || (r > 34 && i === xf - 2 && r % 2)) {
-        col = 'J';
-      } else if (i <= xb + 1) {
-        col = r > 34 && i === xb ? 'Q' : 'q';              // côté ombre
-      } else if (r > 34) {
-        const d = i - xb;
-        if (d === 4 || d === 8 || d === 11) col = 'q';     // plis de la jupe
-        else if (d === 5 || d === 9) col = 'J';
-      } else if (r === 22 && i > xb + 1 && i < xf - 1) {
-        col = 'q';                                         // ombre sous la poitrine
-      } else if (i === xb + 2 && (i + r) % 2) {
-        col = 'q';                                         // dégradé tramé
-      }
-      px(col, i, r);
+    if (look.pack && r >= 16 && r <= 29) {
+      for (let i = 6; i <= 10; i++) px(i === 6 || r === 29 ? 'A' : (i === 7 && r < 22 ? lighten(C.a, 0.3) : 'a'), i, r); // sac à dos
     }
-    if (r === H2 - 1) for (let i = xb; i <= xf; i++) px(i === xf ? 'q' : 'Q', i, r); // ourlet
+    const [xb, xf] = fineBodyEdges(r, look.outfit);
+    const from = look.hair === 'long' && r <= 34 ? Math.max(xb, 11) : look.pack && r >= 16 && r <= 29 ? 11 : xb;
+    for (let i = from; i <= xf; i++) {
+      px(look.outfit === 'dress' ? dressColor(r, i, xb, xf) : jacketColor(r, i, xb, xf), i, r);
+    }
+    if (look.outfit === 'dress' && r === H2 - 1 && pose === 'stand') {
+      for (let i = xb; i <= xf; i++) px(i === xf ? 'q' : 'Q', i, r); // ourlet
+    }
   }
+  byP[key] = c;
   return c;
+}
+
+// buste du pilote sur un véhicule : remplace l'ancien sprite de 12 x 14 cellules au même endroit
+function drawPilot(P, o, pose, x, y) {
+  g.drawImage(figure(o.char, pose === 'helmet' ? 'helmet' : 'seat', P), x, y, 12, 14);
 }
 
 function legFine(C, hx, hy, fx, fy, L1, L2) {
@@ -747,52 +671,49 @@ function legFine(C, hx, hy, fx, fy, L1, L2) {
   const cb = Math.max(-1, Math.min(1, (L1 * L1 + d * d - L2 * L2) / (2 * L1 * d)));
   const ka = a - Math.acos(cb);
   const kx = hx + Math.cos(ka) * L1, ky = hy + Math.sin(ka) * L1;
-  // cuisse et genou en legging, puis botte haute à partir de 3 pixels sous le genou
   line(C.leg, hx, hy, kx, ky, 4);
   line(C.legL, hx + 2, hy, kx + 1, ky, 1);
   const bx = kx + (fx - kx) * 0.18, bY = ky + (fy - ky) * 0.18;
   line(C.leg, kx, ky, bx, bY, 3);
   line(C.boot, bx, bY, fx, fy - 2, 3);
   line(C.bootL, bx + 1, bY, fx + 1, fy - 3, 1);
-  R(C.bootL, Math.round(bx) - 1, Math.round(bY), 4, 1);  // revers de la botte
+  if (C.cuff) R(C.bootL, Math.round(bx) - 1, Math.round(bY), 4, 1);  // revers de la botte
   const sx = Math.round(fx), sy = Math.round(fy);
-  R(C.boot, sx - 1, sy - 2, 6, 2);
-  R(C.bootL, sx + 1, sy - 2, 3, 1);
+  R(C.shoe || C.boot, sx - 1, sy - 2, 6, 2);
+  R(C.shoeL || C.bootL, sx + 1, sy - 2, 3, 1);
   R(C.sole, sx - 1, sy, 7, 1);
 }
 
-const FINE_SEGS = [[6, 3, 'k'], [5, 3, 'k'], [2, 3, 'K'], [3, 2, 'b'], [2, 2, 'b', -2, false], [2, 2, 'b', 2], [1, 3, 'r']];
-const LEG_FRONT = { leg: '#1e1c26', legL: '#3a3746', boot: '#5a3820', bootL: '#7a5030', sole: '#1b1412' };
-const LEG_BACK = { leg: '#121018', legL: '#24222e', boot: '#3d2614', bootL: '#5a3820', sole: '#100c0a' };
+function legColors(id, P, front) {
+  if (id === 'kimlu') {
+    return front
+      ? { leg: '#1e1c26', legL: '#3a3746', boot: '#5a3820', bootL: '#7a5030', sole: '#1b1412', cuff: true }
+      : { leg: '#121018', legL: '#24222e', boot: '#3d2614', bootL: '#5a3820', sole: '#100c0a', cuff: true };
+  }
+  // Rider : pantalon aux couleurs du jeu, baskets marron
+  const pants = front ? P.p : P.P;
+  return { leg: pants, legL: lighten(pants, 0.18), boot: pants, bootL: lighten(pants, 0.12),
+           shoe: front ? P.B : darken(P.B, 0.3), shoeL: lighten(P.B, 0.25), sole: '#1b1412' };
+}
 
-function renderFine(o) {
-  const sv = g;
-  g = gF;
-  g.setTransform(1, 0, 0, 1, 0, 0);
-  g.clearRect(0, 0, CW * 2, CH * 2);
-  g.setTransform(1, 0, 0, 1, AX * 2, AY * 2);
-  if (!fineSprite) fineSprite = buildFineSprite();
-  // grande foulée : pas de 9 pixels fins, pied levé de 6
-  const ph = o.travel * 0.36;
-  const by = -Math.round(Math.abs(Math.sin(ph)) * 2);
-  const f1x = 4 + 9 * Math.cos(ph), f1y = -1 + Math.min(0, Math.sin(ph)) * 6;
-  const f2x = 2 + 9 * Math.cos(ph + Math.PI), f2y = -1 + Math.min(0, Math.sin(ph + Math.PI)) * 6;
-  legFine(LEG_BACK, 1, -40 + by, f2x, f2y, 19, 20);
-  legFine(LEG_FRONT, 3, -40 + by, f1x, f1y, 19, 20);
-  g.drawImage(fineSprite, -12, -76 + by);
-  const P = Object.assign({}, palette(o.skin, 'skin', 'kimlu'), FINE);
-  weapon(FINE_SEGS, P, 5, -58 + by, o.angle, (o.recoil || 0) * 3);
-  accessory(o.acc, P, [3, -77 + by], [-7, -60 + by], o.t || 0);
-  g.setTransform(1, 0, 0, 1, 0, 0);
-  g = sv;
+const ARM_SEGS = {
+  kimlu: [[6, 3, 'k'], [5, 3, 'k'], [2, 3, 'K'], [3, 2, 'b'], [2, 2, 'b', -2, false], [2, 2, 'b', 2], [1, 3, 'r']],
+  rider: [[6, 3, 'j'], [5, 3, 'j'], [2, 3, 'k'], [3, 2, 'b'], [2, 2, 'b', -2, false], [2, 2, 'b', 2], [1, 3, 'r']],
+};
 
-  // contour d'un seul pixel fin, très léger : la silhouette se lit par la lumière
+// arme d'un véhicule en pixels fins : bras plus fin (3 pixels), le reste à la même taille qu'avant
+function fineSegs(segs) {
+  return segs.map(([len, th, col, off, adv]) => [len * 2, 'jJkK'.includes(col) ? 3 : th * 2, col, (off || 0) * 2, adv]);
+}
+
+function finishFine(o) {
+  // contour d'un seul pixel fin, discret : la silhouette se lit par la lumière
   ogF.globalCompositeOperation = 'source-over';
   ogF.globalAlpha = 1;
   ogF.clearRect(0, 0, CW * 2, CH * 2);
   for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) ogF.drawImage(cvF, ox, oy);
   ogF.globalCompositeOperation = 'source-in';
-  ogF.fillStyle = 'rgba(10,8,14,0.55)';
+  ogF.fillStyle = 'rgba(10,8,14,0.72)';
   ogF.fillRect(0, 0, CW * 2, CH * 2);
   ogF.globalCompositeOperation = 'source-over';
   ogF.drawImage(cvF, 0, 0);
@@ -804,53 +725,60 @@ function renderFine(o) {
     ogF.globalAlpha = 1;
     ogF.globalCompositeOperation = 'source-over';
   }
+}
+
+function renderWalker(o) {
+  const id = charId(o.char);
+  const P = palette(o.skin, 'skin', o.char);
+  const C = lookColors(id, P);
+  g.setTransform(1, 0, 0, 1, AX * 2, AY * 2);
+  // grande foulée : pas de 9 pixels fins, pied levé de 6
+  const ph = o.travel * 0.36;
+  const by = -Math.round(Math.abs(Math.sin(ph)) * 2);
+  const f1x = 4 + 9 * Math.cos(ph), f1y = -1 + Math.min(0, Math.sin(ph)) * 6;
+  const f2x = 2 + 9 * Math.cos(ph + Math.PI), f2y = -1 + Math.min(0, Math.sin(ph + Math.PI)) * 6;
+  legFine(legColors(id, P, false), 1, -40 + by, f2x, f2y, 19, 20);
+  legFine(legColors(id, P, true), 3, -40 + by, f1x, f1y, 19, 20);
+  g.drawImage(figure(o.char, 'stand', P), -12, -76 + by);
+  const PA = Object.assign({}, P, C);
+  weapon(ARM_SEGS[id], PA, 5, -58 + by, o.angle, (o.recoil || 0) * 3);
+  accessory(o.acc, PA, [3, -77 + by], [-7, -60 + by], o.t || 0);
   return {
-    canvas: outF, fine: true,
     mount: [2.5, (-58 + by) / 2], head: [1.5, (-77 + by) / 2], back: [-3.5, (-60 + by) / 2],
     contacts: [[f1x / 2, 0], [f2x / 2, 0]],
   };
 }
 
+/* Dessine le véhicule `tier` (1..9) et renvoie sa géométrie + le canvas (2 pixels fins par cellule).
+   o = { t, travel, angle, recoil, skin, acc, char, white (0..1), dark (silhouette) } */
 function render(tier, o) {
-  if (tier === 1 && o.char === 'kimlu_cine') return renderFine(o);
   const def = VEHICLES[Math.max(0, Math.min(VEHICLES.length - 1, tier - 1))];
-  const P = palette(o.skin, def.jacket, o.char);
+  const sv = g;
+  g = gF;
   g.setTransform(1, 0, 0, 1, 0, 0);
-  g.clearRect(0, 0, CW, CH);
-  g.setTransform(1, 0, 0, 1, AX, AY);
-  const m = def.draw(P, o);
-  const cine = tier === 1 && o.char === 'kimlu_cine';
-  weapon(cine ? def.segsCine : def.segs, P, m.mount[0], m.mount[1], o.angle, (o.recoil || 0) * Math.min(3, 1 + def.kick));
-  accessory(o.acc, P, m.head, m.back, o.t || 0);
-  g.setTransform(1, 0, 0, 1, 0, 0);
-
-  // contour automatique : silhouette dilatée d'une cellule, teintée en sombre
-  og.globalCompositeOperation = 'source-over';
-  og.globalAlpha = 1;
-  og.clearRect(0, 0, CW, CH);
-  og.drawImage(cv, -1, 0);
-  og.drawImage(cv, 1, 0);
-  og.drawImage(cv, 0, -1);
-  og.drawImage(cv, 0, 1);
-  og.globalCompositeOperation = 'source-in';
-  og.fillStyle = cine ? 'rgba(11,13,22,0.5)' : OUTLINE; // style « Replaced » : silhouette par la lumière, pas par un trait noir
-  og.fillRect(0, 0, CW, CH);
-  og.globalCompositeOperation = 'source-over';
-  og.drawImage(cv, 0, 0);
-  if (o.dark || o.white > 0) {
-    og.globalCompositeOperation = 'source-atop';
-    og.globalAlpha = o.dark ? 1 : Math.min(1, o.white);
-    og.fillStyle = o.dark ? '#0b1022' : '#ffffff';
-    og.fillRect(0, 0, CW, CH);
-    og.globalAlpha = 1;
-    og.globalCompositeOperation = 'source-over';
+  g.clearRect(0, 0, CW * 2, CH * 2);
+  let m;
+  if (def.id === 'marche') {
+    m = renderWalker(o);
+  } else {
+    const P = palette(o.skin, def.jacket, o.char);
+    g.setTransform(2, 0, 0, 2, AX * 2, AY * 2);
+    m = def.draw(P, o);
+    g.setTransform(1, 0, 0, 1, AX * 2, AY * 2);
+    const PA = Object.assign({}, P, lookColors(charId(o.char), P));
+    weapon(fineSegs(def.segs), PA, m.mount[0] * 2, m.mount[1] * 2, o.angle, (o.recoil || 0) * Math.min(3, 1 + def.kick) * 2);
+    accessory(o.acc, PA, [m.head[0] * 2, m.head[1] * 2], [m.back[0] * 2, m.back[1] * 2], o.t || 0);
   }
-  m.canvas = out;
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g = sv;
+  finishFine(o);
+  m.canvas = outF;
+  m.fine = true;
   return m;
 }
 
 function height(tier, char) {
-  return tier === 1 && char === 'kimlu_cine' ? 39 : VEHICLES[tier - 1].h;
+  return tier === 1 ? 39 : VEHICLES[tier - 1].h;
 }
 
 window.TRVehicles = {
