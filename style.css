@@ -5,6 +5,13 @@ html, body {
   height: 100%;
   overflow: hidden;
   background: #0a0e2a;
+  /* téléphones : pas de zoom au double-tap, pas de sélection ni de menu « enregistrer l'image » */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
 }
 
 canvas {

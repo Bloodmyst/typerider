@@ -2782,6 +2782,7 @@ function typeChar(ch) {
   }
 }
 
+window.addEventListener('contextmenu', (e) => e.preventDefault());
 window.addEventListener('blur', () => { if (state === ST_PLAY) state = ST_PAUSE; });
 
 // ===================== MISE À JOUR =====================
@@ -3824,40 +3825,63 @@ const annivName = () => (PRENOM ? PRENOM + ' !' : '!');
 const annivMsg = () => [AGE ? AGE + ' ANS' : '', ANNIV_MSG].filter(Boolean).join(' - ');
 
 function drawTouchNoticeAnniv() {
-  const s1 = fitScale('ANNIVERSAIRE', 6, 24);
-  const name = annivName(), sn = fitScale(name, 8, 24);
-  const msg = annivMsg();
-  let y = 15 * Math.max(2, PX);
-  drawRainbowText('JOYEUX', W / 2, y, s1);
-  y += 7 * s1 + 12;
-  drawRainbowText('ANNIVERSAIRE', W / 2, y, s1);
-  y += 7 * s1 + 16;
-  drawPixelTextOutline(ctx, name, W / 2, y, sn, '#ffd93b', '#101528', 'center');
-  y += 7 * sn + 24;
-  if (msg) {
-    // retour à la ligne si le message est trop long pour l'écran
+  const name = annivName(), msg = annivMsg();
+  const top = 15 * Math.max(2, PX);
+  // le texte s'arrête au-dessus de Kimlu et du gâteau (26 cellules de haut)
+  const bottom = turret.y - (Math.max(V.list[garageMax - 1].h, 26) + 8) * vu();
+  const avail = bottom - top;
+  const wrap = (text, scale) => {
     const lines = [];
-    for (const word of msg.split(' ')) {
+    for (const word of text.split(' ')) {
       const cur = lines.length ? lines[lines.length - 1] : null;
-      if (cur !== null && textWidth(cur + ' ' + word, 2) <= W - 24) lines[lines.length - 1] = cur + ' ' + word;
+      if (cur !== null && textWidth(cur + ' ' + word, scale) <= W - 24) lines[lines.length - 1] = cur + ' ' + word;
       else lines.push(word);
     }
-    for (const l of lines) {
-      drawPixelTextShadow(ctx, l, W / 2, y, 2, '#ff9ec4', 'center');
+    return lines;
+  };
+  // du plus grand au plus petit : on garde la première taille qui tient en hauteur
+  const tryLayout = (s1, oneLine, withPlay) => {
+    const head = oneLine ? ['JOYEUX ANNIVERSAIRE'] : ['JOYEUX', 'ANNIVERSAIRE'];
+    const sn = Math.min(fitScale(name, 8, 24), s1 + 2);
+    const ts = s1 >= 5 ? 3 : 2;
+    const msgLines = msg ? wrap(msg, 2) : [];
+    const tapLines = candlesLit ? ['TOUCHE L\'ECRAN POUR', 'SOUFFLER LES BOUGIES'] : ['FAIS UN VOEU !'];
+    const h = head.length * (7 * s1 + 12) + 4 + 7 * sn + 20 + msgLines.length * 22 + (msg ? 10 : 0)
+      + tapLines.length * (7 * ts + 10) + (withPlay ? 12 + 2 * 22 : 0);
+    return { head, s1, sn, ts, msgLines, tapLines, withPlay, h };
+  };
+  const options = [];
+  for (const withPlay of [true, false]) {
+    for (let s = 6; s >= 2; s--) {
+      if (textWidth('JOYEUX ANNIVERSAIRE', s) <= W - 24) options.push(tryLayout(s, true, withPlay));
+      if (textWidth('ANNIVERSAIRE', s) <= W - 24) options.push(tryLayout(s, false, withPlay));
+    }
+  }
+  const L = options.find(o => o.h <= avail) || options[options.length - 1];
+  // centré verticalement dans l'espace libre au-dessus de la scène
+  let y = Math.round(top + Math.max(0, (avail - L.h) / 2));
+  for (const t of L.head) {
+    drawRainbowText(t, W / 2, y, L.s1);
+    y += 7 * L.s1 + 12;
+  }
+  y += 4;
+  drawPixelTextOutline(ctx, name, W / 2, y, L.sn, '#ffd93b', '#101528', 'center');
+  y += 7 * L.sn + 20;
+  for (const l of L.msgLines) {
+    drawPixelTextShadow(ctx, l, W / 2, y, 2, '#ff9ec4', 'center');
+    y += 22;
+  }
+  if (L.msgLines.length) y += 10;
+  for (const l of L.tapLines) {
+    drawPixelTextShadow(ctx, l, W / 2, y, L.ts, '#f2f5ff', 'center');
+    y += 7 * L.ts + 10;
+  }
+  if (L.withPlay) {
+    y += 12;
+    for (const l of ['POUR JOUER : UN ORDINATEUR', 'AVEC UN CLAVIER']) {
+      drawPixelTextShadow(ctx, l, W / 2, y, 2, '#9fb3e8', 'center');
       y += 22;
     }
-    y += 12;
-  }
-  const ts = W < 420 ? 2 : 3;
-  const lines = candlesLit ? ['TOUCHE L\'ECRAN POUR', 'SOUFFLER LES BOUGIES'] : ['FAIS UN VOEU !'];
-  for (const l of lines) {
-    drawPixelTextShadow(ctx, l, W / 2, y, ts, '#f2f5ff', 'center');
-    y += 7 * ts + 10;
-  }
-  y += 14;
-  for (const l of ['POUR JOUER : UN ORDINATEUR', 'AVEC UN CLAVIER']) {
-    drawPixelTextShadow(ctx, l, W / 2, y, 2, '#9fb3e8', 'center');
-    y += 24;
   }
 }
 
