@@ -11,7 +11,7 @@
 const CW = 100, CH = 84, AX = 50, AY = 74;
 const cv = document.createElement('canvas');
 cv.width = CW; cv.height = CH;
-const g = cv.getContext('2d');
+let g = cv.getContext('2d'); // contexte de dessin courant (les primitives dessinent ici)
 const out = document.createElement('canvas');
 out.width = CW; out.height = CH;
 const og = out.getContext('2d');
@@ -645,7 +645,174 @@ for (const v of VEHICLES) {
 
 /* Dessine le véhicule `tier` (1..9) et renvoie sa géométrie + le canvas.
    o = { t, travel, angle, recoil, skin, acc, white (0..1), dark (silhouette) } */
+// ---------- Kimlu « cinéma » en haute définition (2 pixels fins par cellule) ----------
+// Tout est dessiné en pixels fins : profil du visage, plis de la robe, jambes et bottes.
+const cvF = document.createElement('canvas');
+cvF.width = CW * 2; cvF.height = CH * 2;
+const gF = cvF.getContext('2d');
+const outF = document.createElement('canvas');
+outF.width = CW * 2; outF.height = CH * 2;
+const ogF = outF.getContext('2d');
+
+const FINE = {
+  u: '#160e10', U: '#2a1b1c', H: '#4a332f', Y: '#7a5040',          // cheveux : ombre, base, reflet, contour chaud
+  k: '#dba27e', K: '#b97f60', L: '#8f5c46', R: '#f6cfa8',          // peau : base, ombre, ombre profonde, contour
+  o: '#140c10', m: '#b2595c',                                        // œil, lèvres
+  j: '#18837f', J: '#2fa59e', q: '#0f5c5a', Q: '#083a39', Z: '#7fd9cf', // robe
+  E: '#e8c050', z: '#38c7b8',                                        // boucle d'oreille
+  b: '#7a4f2e', r: '#c23a3a',                                        // lance-pierre
+};
+
+// tête de profil (vers la droite), lignes de 24 pixels fins
+const FINE_HEAD = [
+  '..........uuuu..........',
+  '........uuUUUUuu........',
+  '.......uUUHHUUUUu.......',
+  '......uUUHHUUUUUUu......',
+  '......uUUUUUUUUUuYu.....',
+  '.....uUUUUUUUUuukR......',
+  '.....uUUUUUUUuukkkR.....',
+  '.....uUUUUUUUuuukkR.....',
+  '.....uUUUUUUUukokkkR....',
+  '.....uUUUUUUKKkkkkkkR...',
+  '.....uUUUUUUEKkkkkkKR...',
+  '.....uUUUUUUzKkkkkmkR...',
+  '.....uUUUUUUUuKkkkkR....',
+  '....uUUUUUUUUUuKkkK.....',
+  '....uUUUUUUUUUuKkkR.....',
+];
+
+// silhouette du corps ligne par ligne : bord arrière et bord avant de la robe
+function fineBodyEdges(r) {
+  if (r <= 16) return [10, 18];             // épaules
+  if (r <= 22) return [10, 19];             // poitrine
+  if (r <= 27) return [11, 17];             // taille qui s'affine
+  if (r === 28) return [11, 16];            // taille
+  if (r <= 34) return [10 - (r > 31 ? 1 : 0), 17 + (r > 31 ? 1 : 0)]; // hanches
+  const t = (r - 35) / 15;                  // jupe évasée jusqu'aux genoux
+  return [Math.round(9 - t * 3), Math.round(18 + t * 3)];
+}
+
+let fineSprite = null;
+function buildFineSprite() {
+  const W2 = 24, H2 = 51;
+  const c = document.createElement('canvas');
+  c.width = W2; c.height = H2;
+  const x = c.getContext('2d');
+  const px = (col, cx, cy) => { x.fillStyle = FINE[col] || col; x.fillRect(cx, cy, 1, 1); };
+  FINE_HEAD.forEach((row, r) => { for (let i = 0; i < row.length; i++) if (row[i] !== '.') px(row[i], i, r); });
+  for (let r = 15; r < H2; r++) {
+    // longs cheveux qui tombent dans le dos, avec un reflet
+    if (r <= 34) {
+      const h0 = r < 18 ? 4 : r < 28 ? 3 : 4 + Math.floor((r - 28) / 2);
+      const h1 = r < 28 ? 10 : 10 - Math.floor((r - 28) / 3);
+      for (let i = h0; i <= h1; i++) px(i === h0 ? 'u' : (i === h0 + 2 && r < 30 ? 'H' : 'U'), i, r);
+    }
+    const [xb, xf] = fineBodyEdges(r);
+    for (let i = Math.max(xb, r <= 34 ? 11 : xb); i <= xf; i++) {
+      let col = 'j';
+      if (r <= 19 && i >= 14 + (r - 15)) {
+        // décolleté asymétrique : épaule et haut du buste nus côté face
+        col = i === xf ? 'R' : i === 14 + (r - 15) ? 'K' : 'k';
+      } else if (r === 28) {
+        col = i === xf ? 'Z' : 'Q';                       // taille froncée
+      } else if (i === xf) {
+        col = 'Z';                                         // contour de lumière
+      } else if (i === xf - 1 || (r > 34 && i === xf - 2 && r % 2)) {
+        col = 'J';
+      } else if (i <= xb + 1) {
+        col = r > 34 && i === xb ? 'Q' : 'q';              // côté ombre
+      } else if (r > 34) {
+        const d = i - xb;
+        if (d === 4 || d === 8 || d === 11) col = 'q';     // plis de la jupe
+        else if (d === 5 || d === 9) col = 'J';
+      } else if (r === 22 && i > xb + 1 && i < xf - 1) {
+        col = 'q';                                         // ombre sous la poitrine
+      } else if (i === xb + 2 && (i + r) % 2) {
+        col = 'q';                                         // dégradé tramé
+      }
+      px(col, i, r);
+    }
+    if (r === H2 - 1) for (let i = xb; i <= xf; i++) px(i === xf ? 'q' : 'Q', i, r); // ourlet
+  }
+  return c;
+}
+
+function legFine(C, hx, hy, fx, fy, L1, L2) {
+  let dx = fx - hx, dy = fy - hy, d = Math.hypot(dx, dy);
+  const md = L1 + L2 - 0.05;
+  if (d > md) { fx = hx + dx / d * md; fy = hy + dy / d * md; d = md; }
+  d = Math.max(0.1, d);
+  const a = Math.atan2(fy - hy, fx - hx);
+  const cb = Math.max(-1, Math.min(1, (L1 * L1 + d * d - L2 * L2) / (2 * L1 * d)));
+  const ka = a - Math.acos(cb);
+  const kx = hx + Math.cos(ka) * L1, ky = hy + Math.sin(ka) * L1;
+  // cuisse et genou en legging, puis botte haute à partir de 3 pixels sous le genou
+  line(C.leg, hx, hy, kx, ky, 4);
+  line(C.legL, hx + 2, hy, kx + 1, ky, 1);
+  const bx = kx + (fx - kx) * 0.18, bY = ky + (fy - ky) * 0.18;
+  line(C.leg, kx, ky, bx, bY, 3);
+  line(C.boot, bx, bY, fx, fy - 2, 3);
+  line(C.bootL, bx + 1, bY, fx + 1, fy - 3, 1);
+  R(C.bootL, Math.round(bx) - 1, Math.round(bY), 4, 1);  // revers de la botte
+  const sx = Math.round(fx), sy = Math.round(fy);
+  R(C.boot, sx - 1, sy - 2, 6, 2);
+  R(C.bootL, sx + 1, sy - 2, 3, 1);
+  R(C.sole, sx - 1, sy, 7, 1);
+}
+
+const FINE_SEGS = [[6, 3, 'k'], [5, 3, 'k'], [2, 3, 'K'], [3, 2, 'b'], [2, 2, 'b', -2, false], [2, 2, 'b', 2], [1, 3, 'r']];
+const LEG_FRONT = { leg: '#1e1c26', legL: '#3a3746', boot: '#5a3820', bootL: '#7a5030', sole: '#1b1412' };
+const LEG_BACK = { leg: '#121018', legL: '#24222e', boot: '#3d2614', bootL: '#5a3820', sole: '#100c0a' };
+
+function renderFine(o) {
+  const sv = g;
+  g = gF;
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.clearRect(0, 0, CW * 2, CH * 2);
+  g.setTransform(1, 0, 0, 1, AX * 2, AY * 2);
+  if (!fineSprite) fineSprite = buildFineSprite();
+  // grande foulée : pas de 9 pixels fins, pied levé de 6
+  const ph = o.travel * 0.36;
+  const by = -Math.round(Math.abs(Math.sin(ph)) * 2);
+  const f1x = 4 + 9 * Math.cos(ph), f1y = -1 + Math.min(0, Math.sin(ph)) * 6;
+  const f2x = 2 + 9 * Math.cos(ph + Math.PI), f2y = -1 + Math.min(0, Math.sin(ph + Math.PI)) * 6;
+  legFine(LEG_BACK, 1, -40 + by, f2x, f2y, 19, 20);
+  legFine(LEG_FRONT, 3, -40 + by, f1x, f1y, 19, 20);
+  g.drawImage(fineSprite, -12, -76 + by);
+  const P = Object.assign({}, palette(o.skin, 'skin', 'kimlu'), FINE);
+  weapon(FINE_SEGS, P, 5, -58 + by, o.angle, (o.recoil || 0) * 3);
+  accessory(o.acc, P, [3, -77 + by], [-7, -60 + by], o.t || 0);
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g = sv;
+
+  // contour d'un seul pixel fin, très léger : la silhouette se lit par la lumière
+  ogF.globalCompositeOperation = 'source-over';
+  ogF.globalAlpha = 1;
+  ogF.clearRect(0, 0, CW * 2, CH * 2);
+  for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) ogF.drawImage(cvF, ox, oy);
+  ogF.globalCompositeOperation = 'source-in';
+  ogF.fillStyle = 'rgba(10,8,14,0.55)';
+  ogF.fillRect(0, 0, CW * 2, CH * 2);
+  ogF.globalCompositeOperation = 'source-over';
+  ogF.drawImage(cvF, 0, 0);
+  if (o.dark || o.white > 0) {
+    ogF.globalCompositeOperation = 'source-atop';
+    ogF.globalAlpha = o.dark ? 1 : Math.min(1, o.white);
+    ogF.fillStyle = o.dark ? '#0b1022' : '#ffffff';
+    ogF.fillRect(0, 0, CW * 2, CH * 2);
+    ogF.globalAlpha = 1;
+    ogF.globalCompositeOperation = 'source-over';
+  }
+  return {
+    canvas: outF, fine: true,
+    mount: [2.5, (-58 + by) / 2], head: [1.5, (-77 + by) / 2], back: [-3.5, (-60 + by) / 2],
+    contacts: [[f1x / 2, 0], [f2x / 2, 0]],
+  };
+}
+
 function render(tier, o) {
+  if (tier === 1 && o.char === 'kimlu_cine') return renderFine(o);
   const def = VEHICLES[Math.max(0, Math.min(VEHICLES.length - 1, tier - 1))];
   const P = palette(o.skin, def.jacket, o.char);
   g.setTransform(1, 0, 0, 1, 0, 0);

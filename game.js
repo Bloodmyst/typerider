@@ -1973,6 +1973,11 @@ function displayTier() {
   if (state === ST_SHOP) return garageSel + 1;
   return state === ST_TITLE ? garageMax : vehicleTier;
 }
+// hauteur du pilote à l'écran, en pixels (la version haute définition est un peu plus grande)
+function charPx(tier) {
+  const fine = tier === 1 && equipped.char === 'kimlu_cine';
+  return V.height(tier, equipped.char) * (fine ? 2 * Math.ceil(vu() / 2) : vu());
+}
 function vu() { return Math.max(2, Math.round(PX * 0.9)); } // taille d'une cellule de véhicule
 function groundSpeedPx() { return 34 * worldSpeed * PX; }
 
@@ -2526,7 +2531,8 @@ function blowProgress() {
 function drawCake() {
   const u = vu();
   const def = V.list[garageMax - 1];
-  const cx = Math.round(turret.x + (def.halfW + 22) * u), base = turret.y;
+  const extra = garageMax === 1 && equipped.char === 'kimlu_cine' ? 8 : 0; // la grande Kimlu tend le bras plus loin
+  const cx = Math.round(turret.x + (def.halfW + 22 + extra) * u), base = turret.y;
   const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(cx + x * u, base + y * u, w * u, h * u); };
   const ink = '#141a2e';
   // assiette
@@ -3102,8 +3108,10 @@ function drawVehicleAt(tier, x, y, u, o) {
     ctx.fillRect(Math.round(x - sw), Math.round(y), Math.round(sw * 2), u);
   }
   const m = V.render(tier, o);
-  ctx.drawImage(m.canvas, Math.round(x - V.AX * u), Math.round(y - V.AY * u), V.CW * u, V.CH * u);
-  m.x = x; m.y = y; m.u = u; m.tier = tier;
+  // Kimlu haute définition : 2 pixels fins par cellule, chacun sur un nombre entier de pixels d'écran
+  const cs = m.fine ? 2 * Math.ceil(u / 2) : u;
+  ctx.drawImage(m.canvas, Math.round(x - V.AX * cs), Math.round(y - V.AY * cs), V.CW * cs, V.CH * cs);
+  m.x = x; m.y = y; m.u = cs; m.tier = tier;
   if (!o.dark && m.headlight) drawHeadlight(m);
   return m;
 }
@@ -3842,7 +3850,7 @@ function drawTouchNoticeAnniv() {
   const name = annivName(), msg = annivMsg();
   const top = 15 * Math.max(2, PX);
   // le texte s'arrête au-dessus de Kimlu et du gâteau (26 cellules de haut)
-  const bottom = turret.y - (Math.max(V.height(garageMax, equipped.char), 26) + 8) * vu();
+  const bottom = turret.y - (Math.max(charPx(garageMax), 26 * vu()) + 8 * vu());
   const avail = bottom - top;
   const wrap = (text, scale) => {
     const lines = [];
@@ -3942,7 +3950,7 @@ function drawTitle() {
     return b;
   };
   const top = ANNIV ? 15 * Math.max(2, PX) : 20, pad = 16;
-  const bottom = turret.y - (V.height(garageMax, equipped.char) + 10) * vu();
+  const bottom = turret.y - (charPx(garageMax) + 10 * vu());
   const fit = (bl) => {
     const fixed = bl.reduce((s, x) => s + x.h, 0) + pad * 2;
     const gaps = bl.reduce((s, x) => s + x.gap, 0);
@@ -4081,6 +4089,7 @@ if (/[?&]debug\b/.test(location.search)) window.__TR = {
   get worldSpeed() { return worldSpeed; },
   giveCredits(n) { credits += n; saveMeta(); },
   setTier(n) { vehicleTier = n; garageMax = Math.max(garageMax, n); },
+  setChar(c) { equipped.char = c; },
   setBiome(i, tod) { setBiome(i, tod || 0); },
   spawn(kind, y) { spawnWord(); const w = words[words.length - 1]; w.kind = kind || null; if (y) w.y = y; return w.text; },
   get freeze() { return freezeT; },
