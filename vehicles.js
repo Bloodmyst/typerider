@@ -50,6 +50,7 @@ const KIMLU_LOOK = {
   k: '#e9b48e', K: '#c98b67',
   j: '#1f9a95', J: '#45c2b8', q: '#14706d',
   p: '#262433', P: '#17151f',
+  R: '#ffd9b0', Y: '#8f5f48', Q: '#0a3e3d',
 };
 
 function palette(skinId, jacket, char) {
@@ -59,7 +60,7 @@ function palette(skinId, jacket, char) {
   const P = Object.assign({}, FIXED, s, { A: darken(s.a, 0.3) });
   if (jacket === 'cream') Object.assign(P, { j: P.c, J: P.e, q: P.C });
   else Object.assign(P, { j: P.m, J: P.l, q: P.d });
-  if (char === 'kimlu') Object.assign(P, KIMLU_LOOK);
+  if (char && char.startsWith('kimlu')) Object.assign(P, KIMLU_LOOK);
   palCache[key] = P;
   return P;
 }
@@ -99,6 +100,31 @@ const SPRITES = {
     '..aa.qqqqqq.',
   ],
   // Kimlu : mêmes dimensions et mêmes points d'attache que le pilote d'origine
+  kimluTall: [
+    '....uuuu....',
+    '...uuuuuUY..',
+    '..uuuuuuuUY.',
+    '..uuuuuuukR.',
+    '..uuuuukokR.',
+    '..uuuukkkkkR',
+    '..uuuuEkkeK.',
+    '..uuuuzKkK..',
+    '..uuuuuKk...',
+    '.uuuuujjjkR.',
+    '.uuuuqjjjjJ.',
+    '.uuuuqjjqjJ.',
+    '.uuuuqjjqjJ.',
+    '..uuuqjjqjJ.',
+    '..uuuqjjjJJ.',
+    '...uuqqjjjJ.',
+    '....qQQQQq..',
+    '....qjjjjjJ.',
+    '...qqjqjjqjJ',
+    '...qjjqjjqjJ',
+    '..qqjjqjjqjJ',
+    '..qjjjqjjjqJ',
+    '..QQqqqqqqqQ',
+  ],
   torsoK: [
     '...uuuuu....',
     '..uuuuuuuu..',
@@ -134,7 +160,7 @@ const SPRITES = {
 };
 
 // sprite du pilote choisi (o.char === 'kimlu' → variante K)
-function pilot(o, base) { return o.char === 'kimlu' ? base + 'K' : base; }
+function pilot(o, base) { return o.char && o.char.startsWith('kimlu') ? base + 'K' : base; }
 
 const sprCache = {};
 function sprite(name, P, key) {
@@ -245,6 +271,23 @@ function leg(col, shoe, hx, hy, fx, fy, L1, L2) {
   R(shoe, sx - 1, sy - 1, 3, 1);
 }
 
+function legBoot(P, hx, hy, fx, fy, L1, L2) {
+  let dx = fx - hx, dy = fy - hy, d = Math.hypot(dx, dy);
+  const md = L1 + L2 - 0.05;
+  if (d > md) { fx = hx + dx / d * md; fy = hy + dy / d * md; d = md; }
+  d = Math.max(0.1, d);
+  const a = Math.atan2(fy - hy, fx - hx);
+  const cb = Math.max(-1, Math.min(1, (L1 * L1 + d * d - L2 * L2) / (2 * L1 * d)));
+  const ka = a - Math.acos(cb);
+  const kx = hx + Math.cos(ka) * L1, ky = hy + Math.sin(ka) * L1;
+  line(P.p, hx, hy, kx, ky, 2);
+  line(P.B, kx, ky, fx, fy, 2);
+  line(P.b, kx + 1, ky, (kx + fx) / 2 + 1, (ky + fy) / 2, 1);
+  const sx = Math.round(fx), sy = Math.round(fy);
+  R(P.B, sx - 1, sy - 1, 4, 1);
+  R(P.t, sx - 1, sy, 5, 1);
+}
+
 // arme orientée : suite de segments [longueur, épaisseur, couleur, décalage, avance]
 function weapon(segs, P, px, py, ang, recoil) {
   const cx = Math.cos(ang), sy = Math.sin(ang), nx = -sy, ny = cx;
@@ -315,7 +358,21 @@ const VEHICLES = [
     id: 'marche', name: 'A PIED', weapon: 'LANCE-PIERRE', jacket: 'skin',
     speed: 0.35, proj: 'caillou', kick: 0.6, halfW: 7, h: 23,
     segs: [[2.5, 2, 'j'], [1.5, 2, 'k'], [2.5, 1, 'b'], [2, 1, 'b', -1, false], [2, 1, 'b', 1], [0.5, 3, 'r']],
+    segsCine: [[3, 2, 'k'], [1, 2, 'K'], [2.5, 1, 'b'], [2, 1, 'b', -1, false], [2, 1, 'b', 1], [0.5, 3, 'r']],
     draw(P, o) {
+      if (o.char === 'kimlu_cine') {
+        // grande foulée, léger balancement, jambe arrière plus sombre
+        const ph = o.travel * 0.36;
+        const by = -Math.round(Math.abs(Math.sin(ph)));
+        const f1x = 1.5 + 4.5 * Math.cos(ph), f1y = -2 + Math.min(0, Math.sin(ph)) * 3.5;
+        const f2x = 0.5 + 4.5 * Math.cos(ph + Math.PI), f2y = -2 + Math.min(0, Math.sin(ph + Math.PI)) * 3.5;
+        const back = Object.assign({}, P, { p: P.P, B: darken(P.B, 0.35), b: P.B });
+        legBoot(back, 0, -19 + by, f2x, f2y, 9, 9);
+        legBoot(P, 1.5, -19 + by, f1x, f1y, 9, 9);
+        g.drawImage(sprite('kimluTall', P, o.skin + o.char), -6, -38 + by);
+        return { mount: [3.5, -28 + by], head: [1.5, -38 + by], back: [-4, -29 + by],
+                 contacts: [[f1x, 0], [f2x, 0]] };
+      }
       const ph = o.travel * 0.52;
       const by = -Math.round(Math.abs(Math.sin(ph)));
       const f1x = 3 * Math.cos(ph), f1y = -2 + Math.min(0, Math.sin(ph)) * 2.5;
@@ -595,7 +652,8 @@ function render(tier, o) {
   g.clearRect(0, 0, CW, CH);
   g.setTransform(1, 0, 0, 1, AX, AY);
   const m = def.draw(P, o);
-  weapon(def.segs, P, m.mount[0], m.mount[1], o.angle, (o.recoil || 0) * Math.min(3, 1 + def.kick));
+  const cine = tier === 1 && o.char === 'kimlu_cine';
+  weapon(cine ? def.segsCine : def.segs, P, m.mount[0], m.mount[1], o.angle, (o.recoil || 0) * Math.min(3, 1 + def.kick));
   accessory(o.acc, P, m.head, m.back, o.t || 0);
   g.setTransform(1, 0, 0, 1, 0, 0);
 
@@ -608,7 +666,7 @@ function render(tier, o) {
   og.drawImage(cv, 0, -1);
   og.drawImage(cv, 0, 1);
   og.globalCompositeOperation = 'source-in';
-  og.fillStyle = OUTLINE;
+  og.fillStyle = cine ? 'rgba(11,13,22,0.5)' : OUTLINE; // style « Replaced » : silhouette par la lumière, pas par un trait noir
   og.fillRect(0, 0, CW, CH);
   og.globalCompositeOperation = 'source-over';
   og.drawImage(cv, 0, 0);
@@ -624,7 +682,12 @@ function render(tier, o) {
   return m;
 }
 
+function height(tier, char) {
+  return tier === 1 && char === 'kimlu_cine' ? 39 : VEHICLES[tier - 1].h;
+}
+
 window.TRVehicles = {
+  height,
   list: VEHICLES,
   SKINS,
   CW, CH, AX, AY,

@@ -1742,7 +1742,12 @@ function saveMeta() {
   saveJSON('typerider.garage', garageMax);
 }
 const fxActive = (id) => owned.includes(id) && fxOn.includes(id);
-if (!equipped.char) equipped.char = ANNIV ? 'kimlu' : 'rider';
+if (!equipped.char) equipped.char = ANNIV ? 'kimlu_cine' : 'rider';
+// essai « style Replaced » : on montre la nouvelle Kimlu une première fois (le choix reste libre dans PERSO)
+if (ANNIV && equipped.char === 'kimlu' && !loadJSON('typerider.cine', false)) {
+  equipped.char = 'kimlu_cine';
+  saveJSON('typerider.cine', true);
+}
 
 // cadeau d'anniversaire : offert une seule fois par prénom
 let annivGift = 0;
@@ -1753,7 +1758,7 @@ if (ANNIV) {
     credits += annivGift;
     for (const id of ['skin_rose', 'acc_fete', 'fx_confettis']) if (!owned.includes(id)) owned.push(id);
     if (!fxOn.includes('fx_confettis')) fxOn.push('fx_confettis');
-    Object.assign(equipped, { skin: 'skin_rose', acc: 'acc_fete', char: 'kimlu' });
+    Object.assign(equipped, { skin: 'skin_rose', acc: 'acc_fete', char: 'kimlu_cine' });
     saveMeta();
     saveJSON(key, true);
   }
@@ -1761,7 +1766,8 @@ if (ANNIV) {
 
 // ===================== BOUTIQUE =====================
 const PILOTS = [
-  { id: 'kimlu', name: 'KIMLU' },
+  { id: 'kimlu_cine', name: 'KIMLU CINEMA' },
+  { id: 'kimlu', name: 'KIMLU CLASSIQUE' },
   { id: 'rider', name: 'RIDER' },
 ];
 
@@ -3087,6 +3093,14 @@ function drawVehicleAt(tier, x, y, u, o) {
     if (fxActive('fx_aura')) drawAura(x, y, u, def);
     if (fxActive('fx_neon')) drawNeon(x, y, u, def);
   }
+  if (!o.dark) {
+    // ombre portée au sol, plus large que le véhicule, pour l'ancrer dans le décor
+    const def0 = V.list[tier - 1], sw = (def0.halfW + 2) * u;
+    ctx.fillStyle = 'rgba(6,8,18,0.32)';
+    ctx.fillRect(Math.round(x - sw + 2 * u), Math.round(y - u), Math.round(sw * 2 - 4 * u), u);
+    ctx.fillStyle = 'rgba(6,8,18,0.2)';
+    ctx.fillRect(Math.round(x - sw), Math.round(y), Math.round(sw * 2), u);
+  }
   const m = V.render(tier, o);
   ctx.drawImage(m.canvas, Math.round(x - V.AX * u), Math.round(y - V.AY * u), V.CW * u, V.CH * u);
   m.x = x; m.y = y; m.u = u; m.tier = tier;
@@ -3828,7 +3842,7 @@ function drawTouchNoticeAnniv() {
   const name = annivName(), msg = annivMsg();
   const top = 15 * Math.max(2, PX);
   // le texte s'arrête au-dessus de Kimlu et du gâteau (26 cellules de haut)
-  const bottom = turret.y - (Math.max(V.list[garageMax - 1].h, 26) + 8) * vu();
+  const bottom = turret.y - (Math.max(V.height(garageMax, equipped.char), 26) + 8) * vu();
   const avail = bottom - top;
   const wrap = (text, scale) => {
     const lines = [];
@@ -3928,7 +3942,7 @@ function drawTitle() {
     return b;
   };
   const top = ANNIV ? 15 * Math.max(2, PX) : 20, pad = 16;
-  const bottom = turret.y - (V.list[garageMax - 1].h + 10) * vu();
+  const bottom = turret.y - (V.height(garageMax, equipped.char) + 10) * vu();
   const fit = (bl) => {
     const fixed = bl.reduce((s, x) => s + x.h, 0) + pad * 2;
     const gaps = bl.reduce((s, x) => s + x.gap, 0);
