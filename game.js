@@ -148,6 +148,21 @@ function drawPixelTextShadow(c2, text, x, y, scale, color, align, adv) {
   drawPixelText(c2, text, x, y, scale, color, align, adv);
 }
 
+// ===================== ÉDITION ANNIVERSAIRE (réglages dans anniversaire.js) =====================
+const ANNIV_CFG = Object.assign({ actif: false, prenom: '', age: 0, message: '', cadeau: 0 }, window.TR_ANNIV || {});
+const ANNIV = !!ANNIV_CFG.actif;
+// la police n'a ni accents ni minuscules : on simplifie, et on remplace l'inconnu par un espace
+const pixelSafe = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase()
+  .split('').map(c => (FONT[c] ? c : ' ')).join('').trim();
+const PRENOM = pixelSafe(ANNIV_CFG.prenom);
+const PRENOM_WORD = PRENOM.replace(/[^A-Z]/g, '');
+const AGE = Math.max(0, Math.min(99, parseInt(ANNIV_CFG.age, 10) || 0));
+const ANNIV_MSG = pixelSafe(ANNIV_CFG.message);
+const FETE_COLORS = ['#ff5d8f', '#ffd93b', '#7ad9ff', '#7affc0', '#d38bff', '#ff8c42'];
+if (ANNIV) {
+  document.title = 'TypeRider — Joyeux anniversaire' + (ANNIV_CFG.prenom ? ' ' + ANNIV_CFG.prenom : '') + ' !';
+}
+
 function drawPixelTextOutline(c2, text, x, y, scale, color, outline, align) {
   const o = scale;
   drawPixelText(c2, text, x + o, y + o, scale, outline, align);
@@ -1410,6 +1425,8 @@ function drawBackground(dt) {
     bctx.globalAlpha = 1;
   }
 
+  if (ANNIV) drawSkyBalloons(dt);
+
   // couches de relief (défilement vers la gauche : on voyage vers la droite)
   layers.forEach((layer, li) => {
     const y = horizon - layer.th + 2;
@@ -1588,6 +1605,32 @@ const AudioSys = {
     src.connect(lp).connect(gn).connect(this.ctx.destination);
     src.start(t);
   },
+  pop() { this.noise(0.05, 0.08); this.tone(950, 0.07, 'square', 0.035, -650); },
+  birthday() {
+    // « Joyeux anniversaire » : mélodie + basse sur les temps forts
+    if (this.playingSong) return;
+    this.playingSong = true;
+    const N = { G3: 196, C4: 261.63, D4: 293.66, F4: 349.23, G4: 392, A4: 440, B4: 493.88,
+                C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99 };
+    const tune = [
+      ['G4', .75, 'C4'], ['G4', .25], ['A4', 1, 'G3'], ['G4', 1], ['C5', 1, 'C4'], ['B4', 2, 'G3'],
+      ['G4', .75, 'G3'], ['G4', .25], ['A4', 1, 'G3'], ['G4', 1], ['D5', 1, 'G3'], ['C5', 2, 'C4'],
+      ['G4', .75, 'C4'], ['G4', .25], ['G5', 1, 'C4'], ['E5', 1], ['C5', 1, 'F4'], ['B4', 1], ['A4', 2, 'F4'],
+      ['F5', .75, 'F4'], ['F5', .25], ['E5', 1, 'C4'], ['C5', 1], ['D5', 1, 'G3'], ['C5', 2.5, 'C4'],
+    ];
+    const beat = 0.36;
+    let t = 0;
+    for (const [n, d, bass] of tune) {
+      const at = t * beat * 1000;
+      setTimeout(() => {
+        this.tone(N[n], d * beat * 0.95, 'triangle', 0.1);
+        this.tone(N[n] * 2, d * beat * 0.5, 'square', 0.012);
+        if (bass) this.tone(N[bass] / 2, d * beat * 1.4, 'sine', 0.06);
+      }, at);
+      t += d;
+    }
+    setTimeout(() => { this.playingSong = false; }, t * beat * 1000);
+  },
   over() {
     [523, 440, 349, 262].forEach((f, i) => setTimeout(() => this.tone(f, 0.3, 'triangle', 0.09), i * 220));
   },
@@ -1602,7 +1645,14 @@ const WORDS = {
   medium: ['riviere','prairie','vallee','sommet','rocher','source','aurore','mousse','etoile','soleil','chemin','sentier','falaise','colline','torrent','cascade','glacier','ruisseau','feuille','branche','racine','ecorce','buisson','tempete','eclair','horizon','erable','luciole','orchidee','roseau','jungle','corail','tilleul','bouleau','renard','lievre','fougere','bruyere','lavande','jasmin','muguet','sorbier','cypres','sequoia','platane','crevasse','plateau','canyon','volcan','geyser','lagune','savane','faucon','loutre','castor','mouflon','chamois','belette','toundra','moraine','baobab','anemone','tulipe','gentiane','aubepine','digitale','archipel'],
   long: ['montagne','papillon','libellule','hirondelle','crepuscule','escalade','panorama','avalanche','brouillard','chevreuil','ecureuil','marmotte','myrtille','framboise','campagne','clairiere','alpiniste','belvedere','stalactite','coquelicot','chataignier','sauterelle','coccinelle','peninsule','bouquetin','salamandre','grenouille','scarabee','araignee','chrysalide','eglantine','paquerette','pissenlit','tournesol','genevrier','clematite','primevere','cordillere','permafrost','eucalyptus','edelweiss','peuplier','noisette','chouette','herisson','estuaire','sanglier','blaireau'],
   verylong: ['constellation','biodiversite','photosynthese','meteorologie','hibernation','germination','pollinisation','sedimentation','cristallisation','precipitations','transhumance','chlorophylle','rhododendron','cornouiller','stratosphere','metamorphose'],
+  // édition anniversaire
+  anniv: ['fete','joie','rire','voeu','ami','amie','jeu','bisou','danse','jouet','bravo','tarte','glace','crepe','ruban','magie','cadeau','gateau','bougie','ballon','fraise','bonbon','festin','paquet','etoile','hourra','joyeux','sourire','famille','copain','copine','dessert','chapeau','chanson','musique','lampion','surprise','confetti','chocolat','cotillon','guirlande','serpentin','farandole','anniversaire'],
 };
+
+function annivPool(d) {
+  const maxLen = d.pool === 'poussin' ? 5 : d.pool === 'enfant' ? 8 : 99;
+  return WORDS.anniv.filter(w => w.length <= maxLen);
+}
 
 function pickWord(wave, existing) {
   let pool;
@@ -1621,10 +1671,15 @@ function pickWord(wave, existing) {
   else if (wave <= 7) pool = r < 0.2 ? WORDS.short : (r < 0.6 ? WORDS.medium : WORDS.long);
   else pool = r < 0.15 ? WORDS.short : (r < 0.5 ? WORDS.medium : (r < 0.85 ? WORDS.long : WORDS.verylong));
   // éviter deux mots actifs commençant par la même lettre (ambiguïté de ciblage)
-  const used = new Set(existing.map(w => w.text[0]));
+  const used = new Set(existing.filter(w => !w.dying).map(w => w.text[0]));
+  if (ANNIV) {
+    // le prénom tombe de temps en temps, et 40 % des mots parlent de fête
+    if (PRENOM_WORD && Math.random() < 0.06 && !used.has(PRENOM_WORD[0])) return PRENOM_WORD.toLowerCase();
+    if (Math.random() < 0.4) pool = annivPool(d);
+  }
   for (let tries = 0; tries < 24; tries++) {
     const w = pool[Math.floor(Math.random() * pool.length)];
-    if (!used.has(w[0]) || tries > 15) return w;
+    if (!used.has(w[0].toUpperCase()) || tries > 15) return w;
   }
   return pool[Math.floor(Math.random() * pool.length)];
 }
@@ -1687,9 +1742,31 @@ function saveMeta() {
   saveJSON('typerider.garage', garageMax);
 }
 const fxActive = (id) => owned.includes(id) && fxOn.includes(id);
+if (!equipped.char) equipped.char = ANNIV ? 'kimlu' : 'rider';
+
+// cadeau d'anniversaire : offert une seule fois par prénom
+let annivGift = 0;
+if (ANNIV) {
+  const key = 'typerider.anniv.' + (PRENOM_WORD || 'fete');
+  if (!loadJSON(key, false)) {
+    annivGift = ANNIV_CFG.cadeau | 0;
+    credits += annivGift;
+    for (const id of ['skin_rose', 'acc_fete', 'fx_confettis']) if (!owned.includes(id)) owned.push(id);
+    if (!fxOn.includes('fx_confettis')) fxOn.push('fx_confettis');
+    Object.assign(equipped, { skin: 'skin_rose', acc: 'acc_fete', char: 'kimlu' });
+    saveMeta();
+    saveJSON(key, true);
+  }
+}
 
 // ===================== BOUTIQUE =====================
+const PILOTS = [
+  { id: 'kimlu', name: 'KIMLU' },
+  { id: 'rider', name: 'RIDER' },
+];
+
 const SHOP_TABS = [
+  { id: 'perso', name: 'PERSO' },
   { id: 'skin', name: 'COULEURS' },
   { id: 'acc', name: 'ACCESSOIRES' },
   { id: 'fx', name: 'EFFETS' },
@@ -1709,6 +1786,7 @@ const SHOP_ITEMS = [
   { id: 'acc_lunettes', type: 'acc', name: 'LUNETTES DE SOLEIL', price: 150 },
   { id: 'acc_chapeau', type: 'acc', name: 'CHAPEAU HAUT-DE-FORME', price: 250 },
   { id: 'acc_couronne', type: 'acc', name: 'COURONNE', price: 400 },
+  { id: 'acc_fete', type: 'acc', name: 'CHAPEAU DE FETE', price: 100 },
   // bibliothèque d'effets : chaque effet acheté s'active / se désactive librement
   { id: 'fx_arc', type: 'fx', sub: 'TIRS', name: 'BALLES ARC-EN-CIEL', price: 400 },
   { id: 'fx_comete', type: 'fx', sub: 'TIRS', name: 'TRAINEE DE COMETE', price: 300 },
@@ -1729,6 +1807,7 @@ function shopRows() {
   const tab = SHOP_TABS[shopTab].id;
   if (tab === 'garage') return V.list.map((v, i) => ({ garage: true, i, v }));
   if (tab === 'vfx') return VFX_ITEMS.map(v => ({ vfx: true, key: v.key, sub: v.sub, name: v.name }));
+  if (tab === 'perso') return PILOTS.map(p => ({ perso: true, id: p.id, name: p.name }));
   return SHOP_ITEMS.filter(it => it.type === tab);
 }
 
@@ -1758,6 +1837,12 @@ function shopAction() {
   const it = shopRows()[shopIndex];
   if (!it || it.garage) return;
   const click = () => AudioSys.tone(700, 0.08, 'square', 0.05);
+  if (it.perso) {
+    equipped.char = it.id;
+    saveMeta();
+    click();
+    return;
+  }
   if (it.vfx) {
     // les VFX sont des réglages d'image : gratuits, on les active ou coupe librement
     if (!vfxSupported) { AudioSys.error(); return; }
@@ -1949,6 +2034,10 @@ function vfxParams() {
   if (vehMeta && vehMeta.headlight && pal.starA > 0.3 && state !== ST_SHOP) {
     L.push({ x: vehMeta.x + (vehMeta.headlight[0] + 30) * vehMeta.u, y: groundY - 4, r: 150, i: 0.55 * pal.starA, col: [1, 0.92, 0.7] });
   }
+  // lueur chaude des bougies du gâteau
+  if (ANNIV && state === ST_TITLE && candlesLit && cakeTop) {
+    L.push({ x: cakeTop[0], y: cakeTop[1] - 2 * vu(), r: 70, i: (0.32 + 0.05 * Math.sin(gameT * 13)) * (1 - 0.5 * pal.starA), col: [1, 0.72, 0.4] });
+  }
   return {
     time: gameT,
     on: vfxPrefs,
@@ -2080,6 +2169,7 @@ function spawnWord() {
     swayPh: Math.random() * 6.28,
     swayAmp: 3 + Math.random() * 5,
     dying: false, resetCount: 0, flash: 0,
+    bcol: FETE_COLORS[Math.floor(Math.random() * FETE_COLORS.length)], // ballon (édition anniversaire)
   });
 }
 
@@ -2094,6 +2184,13 @@ function specialEffect(w) {
     spawnParticles(c.x, c.y, 24, '#ffd93b', 240, 0.7, true);
     spawnStars(c.x, c.y, 6);
     AudioSys.coin();
+    if (ANNIV) {
+      // le paquet cadeau contient aussi un bonus
+      const k = Math.random() < 0.5 ? 'rewind' : 'boomerang';
+      inventory[k]++;
+      addPopup(c.x, w.y - 84, k === 'rewind' ? '+ REMONTE-TEMPS' : '+ BOOMERANG', '#7affc0', 2);
+      spawnConfetti(c.x, c.y, 30);
+    }
   } else if (w.kind === 'glace') {
     freezeT = 4;
     addPopup(c.x, w.y - 58, 'GEL !', '#7ad9ff', 3);
@@ -2115,6 +2212,7 @@ function specialEffect(w) {
       if (Math.hypot(oc.x - c.x, oc.y - c.y) > R) continue;
       o.dying = true;
       for (const l of o.letters) l.gone = true;
+      if (ANNIV) popBalloon(o);
       spawnParticles(oc.x, oc.y, 26, '#ff8c42', 280, 0.6, true);
       spawnShards(oc.x, oc.y, 6, '#f2f5ff');
       score += 15 * o.text.length * multiplier();
@@ -2319,6 +2417,231 @@ function maybeDrop(word) {
   }
 }
 
+// ===================== FÊTE (édition anniversaire) =====================
+let rockets = [], fwQueue = [];
+let candlesLit = true, blowT = 0, titleTyped = '';
+let cakeCandles = [], cakeTop = null;
+let skyBalloons = [];
+let giftShown = false;
+const BLOW_WORD = 'SOUFFLE';
+
+function launchFirework(x) {
+  const g = H * 0.9;
+  const top = H * (0.1 + Math.random() * 0.3);
+  rockets.push({
+    x: x != null ? x : W * (0.12 + Math.random() * 0.76),
+    y: groundY, g, vy: -Math.sqrt(2 * g * Math.max(50, groundY - top)),
+    col: FETE_COLORS[Math.floor(Math.random() * FETE_COLORS.length)],
+  });
+  AudioSys.tone(300, 0.35, 'sine', 0.025, 500); // sifflement de la fusée
+}
+
+function scheduleFireworks(n, every) {
+  for (let i = 0; i < n; i++) fwQueue.push(gameT + i * (every || 0.4) + Math.random() * 0.2);
+  fwQueue.sort((a, b) => a - b);
+}
+
+function updateFete(dt) {
+  if (!ANNIV) return;
+  while (fwQueue.length && fwQueue[0] <= gameT) { fwQueue.shift(); launchFirework(); }
+  for (let i = rockets.length - 1; i >= 0; i--) {
+    const r = rockets[i];
+    r.vy += r.g * dt;
+    r.y += r.vy * dt;
+    particles.push({ x: r.x, y: r.y, vx: (Math.random() - 0.5) * 20, vy: 20, life: 0.35, maxLife: 0.35, color: '#fff3b0', size: 1, grav: 0 });
+    if (r.vy < 0) continue;
+    // explosion : couronne d'étincelles colorées + éclair de lumière
+    rockets.splice(i, 1);
+    const n = 60, sp = H * (0.34 + Math.random() * 0.12);
+    for (let k = 0; k < n; k++) {
+      const a = k / n * Math.PI * 2, s = sp * (0.85 + Math.random() * 0.3);
+      particles.push({ x: r.x, y: r.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 1.6, maxLife: 1.6,
+        color: k % 3 ? r.col : '#ffffff', size: 2, grav: 130, star: k % 9 === 0 });
+    }
+    addLight(r.x, r.y, 200, 1, r.col, 0.5);
+    addShock(r.x, r.y, 120, 0.4, 0.5);
+    AudioSys.noise(0.3, 0.06);
+  }
+  if (state === ST_TITLE) {
+    // pluie de confettis
+    if (Math.random() < dt * 22) {
+      const vy = 50 + Math.random() * 40;
+      particles.push({ x: Math.random() * W, y: -10, vx: 0, vy, life: H / vy + 1, maxLife: H / vy + 1,
+        color: FETE_COLORS[Math.floor(Math.random() * FETE_COLORS.length)], size: 2, grav: 8, conf: true, ph: Math.random() * 6 });
+    }
+    if (!candlesLit) {
+      blowT += dt;
+      // filets de fumée juste après avoir soufflé, puis les bougies se rallument
+      if (blowT < 2.5) {
+        for (const [x, y] of cakeCandles) {
+          if (Math.random() < dt * 10) particles.push({ x, y, vx: (Math.random() - 0.5) * 10, vy: -30, life: 1.2, maxLife: 1.2, color: '#cfd6e6', size: 1, grav: -10 });
+        }
+      }
+      if (blowT > 30) candlesLit = true;
+    }
+  }
+  // feux d'artifice de temps en temps pendant les vagues de nuit
+  if (state === ST_PLAY && pal.starA > 0.6 && Math.random() < dt / 6) launchFirework();
+}
+
+function blowCandles() {
+  if (!candlesLit) return;
+  candlesLit = false;
+  blowT = 0;
+  if (cakeTop) {
+    spawnConfetti(cakeTop[0], cakeTop[1], 60);
+    addRing(cakeTop[0], cakeTop[1], 120, '#fff3b0', 0.5);
+  }
+  scheduleFireworks(7, 0.45);
+  AudioSys.birthday();
+}
+
+// lettres tapées sur l'écran titre : SOUFFLE éteint les bougies, le prénom lance un feu d'artifice
+function titleLetter(ch) {
+  const before = blowProgress();
+  titleTyped = (titleTyped + ch).slice(-24);
+  if (candlesLit && titleTyped.endsWith(BLOW_WORD)) { blowCandles(); titleTyped = ''; return; }
+  if (PRENOM_WORD && titleTyped.endsWith(PRENOM_WORD)) {
+    scheduleFireworks(5, 0.3);
+    AudioSys.word(8);
+    titleTyped = '';
+    return;
+  }
+  const p = blowProgress();
+  if (candlesLit && p > before) AudioSys.tone(500 + p * 70, 0.06, 'square', 0.03);
+}
+
+function blowProgress() {
+  for (let k = BLOW_WORD.length; k > 0; k--) if (titleTyped.endsWith(BLOW_WORD.slice(0, k))) return k;
+  return 0;
+}
+
+// gâteau à deux étages posé au sol à droite du véhicule (scène : les flammes brillent avec les VFX)
+function drawCake() {
+  const u = vu();
+  const def = V.list[garageMax - 1];
+  const cx = Math.round(turret.x + (def.halfW + 22) * u), base = turret.y;
+  const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(cx + x * u, base + y * u, w * u, h * u); };
+  const ink = '#141a2e';
+  // assiette
+  R(-14, -2, 28, 2, ink); R(-13, -2, 26, 1, '#eef1fa'); R(-13, -1, 26, 1, '#c9cfdd');
+  // étage du bas, rose
+  R(-12, -11, 24, 9, ink); R(-11, -10, 22, 8, '#ff9ec4'); R(-11, -4, 22, 2, '#e0508f');
+  // étage du haut, crème
+  R(-8, -18, 16, 8, ink); R(-7, -17, 14, 7, '#fff3e0'); R(-7, -12, 14, 1, '#f0d9b5');
+  // nappage qui coule et vermicelles
+  for (let x = -11; x < 11; x++) {
+    const d = 1 + ((x * 7 + 3) % 3 === 0 ? 2 : 0);
+    R(x, -10, 1, d, '#fff3e0');
+  }
+  for (let x = -7; x < 7; x++) if (x % 3 === 0) R(x, -17, 1, 2 + (x & 1), '#ff9ec4');
+  FETE_COLORS.forEach((c, i) => R(-9 + i * 3, -6 - (i % 2), 1, 1, c));
+  // bougies
+  const n = AGE > 0 ? Math.min(AGE, 12) : 5;
+  const span = Math.min(12, n * 2);
+  cakeCandles = [];
+  for (let i = 0; i < n; i++) {
+    const x = n === 1 ? 0 : Math.round(-span / 2 + i * span / (n - 1));
+    const col = FETE_COLORS[i % FETE_COLORS.length];
+    R(x, -22, 1, 4, col); R(x, -21, 1, 1, '#ffffff'); R(x, -23, 1, 1, ink);
+    const fx = cx + x * u + u / 2, fy = base - 24 * u;
+    cakeCandles.push([fx, fy]);
+    if (candlesLit) {
+      const fl = Math.sin(gameT * 18 + i * 1.7) > 0 ? 1 : 0;
+      R(x, -25 - fl, 1, 2 + fl, '#ff8c42');
+      R(x, -24, 1, 1, '#fff3b0');
+    }
+  }
+  cakeTop = [cx, base - 22 * u];
+}
+
+// guirlandes de fanions en haut de l'écran titre
+function drawBunting() {
+  const u = Math.max(2, PX), swag = Math.max(160, W / 4);
+  for (let x0 = 0; x0 < W; x0 += swag) {
+    let i = Math.round(x0 / 9);
+    for (let x = x0; x < x0 + swag; x += u) {
+      const t = (x - x0) / swag;
+      const y = 2 * u + Math.sin(t * Math.PI) * 5 * u;
+      ctx.fillStyle = '#f4f1e8';
+      ctx.fillRect(Math.round(x), Math.round(y), u, u);
+      if (Math.round((x - x0) / u) % 8 === 4) {
+        const col = FETE_COLORS[i++ % FETE_COLORS.length];
+        const sway = Math.round(Math.sin(gameT * 2 + x * 0.05) * u * 0.6);
+        ctx.fillStyle = col;
+        for (let k = 0; k < 6; k++) {
+          const w = Math.max(1, 6 - k);
+          ctx.fillRect(Math.round(x - w * u / 2 + sway * k / 6), Math.round(y + u + k * u), w * u, u);
+        }
+      }
+    }
+  }
+}
+
+// ballons qui montent dans le ciel, derrière le relief (décor basse résolution)
+function drawSkyBalloons(dt) {
+  const want = state === ST_TITLE ? 10 : 5;
+  while (skyBalloons.length < want) {
+    skyBalloons.push({ x: Math.random() * bw, y: bh + Math.random() * bh, sp: 6 + Math.random() * 7,
+      ph: Math.random() * 6, col: FETE_COLORS[skyBalloons.length % FETE_COLORS.length] });
+  }
+  if (skyBalloons.length > want) skyBalloons.length = want;
+  for (const b of skyBalloons) {
+    b.y -= b.sp * dt;
+    if (b.y < -12) { b.y = bh + 6; b.x = Math.random() * bw; }
+    const x = Math.round(b.x + Math.sin(scrollT * 0.8 + b.ph) * 3), y = Math.round(b.y);
+    const col = lerpHex(b.col, '#0e1228', pal.starA * 0.4);
+    bctx.fillStyle = col;
+    bctx.fillRect(x - 1, y - 3, 3, 1);
+    bctx.fillRect(x - 2, y - 2, 5, 3);
+    bctx.fillRect(x - 1, y + 1, 3, 1);
+    bctx.fillRect(x, y + 2, 1, 1);
+    bctx.fillStyle = shadeColor(col, 'shade');
+    bctx.fillRect(x + 1, y, 1, 1);
+    bctx.fillStyle = 'rgba(255,255,255,0.8)';
+    bctx.fillRect(x - 1, y - 2, 1, 1);
+    bctx.fillStyle = 'rgba(240,240,250,0.6)';
+    for (let k = 3; k < 8; k++) bctx.fillRect(x + (Math.sin(scrollT * 3 + k + b.ph) > 0 ? 0 : 1) - 0, y + k, 1, 1);
+  }
+}
+
+// ballon accroché au-dessus d'un mot (interface)
+function drawWordBalloon(w, cx, topY, sc) {
+  const u = Math.max(2, sc);
+  const sway = Math.round(Math.sin(gameT * 2 + w.swayPh) * u * 1.5);
+  const bx = Math.round(cx + sway), cy = Math.round(topY - 5 * u - 4 * u);
+  ctx.fillStyle = 'rgba(240,240,250,0.8)';
+  for (let k = 0; k < 5; k++) ctx.fillRect(Math.round(cx + sway * k / 5 + (k % 2 ? u / 2 : 0)), topY - (k + 1) * u, Math.max(1, u >> 1), u);
+  ctx.fillStyle = w.bcol;
+  for (let dy = -4; dy <= 4; dy++) {
+    const hw = Math.round(3 * Math.sqrt(1 - (dy / 4.6) * (dy / 4.6)));
+    ctx.fillRect(bx - hw * u, cy + dy * u, (hw * 2 + 1) * u, u);
+  }
+  ctx.fillRect(bx - u / 2, cy + 5 * u, u, u);
+  ctx.fillStyle = shadeColor(w.bcol, 'shade');
+  ctx.fillRect(bx + u, cy + 2 * u, 2 * u, u);
+  ctx.fillRect(bx, cy + 3 * u, 2 * u, u);
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.fillRect(bx - 2 * u, cy - 2 * u, u, 2 * u);
+}
+
+function popBalloon(w) {
+  const sc = wordScale(), u = Math.max(2, sc);
+  const c = letterPos(w, (w.text.length - 1) / 2);
+  const y = w.y - 2 * sc - 9 * u;
+  spawnParticles(c.x, y, 14, w.bcol, 220, 0.4);
+  spawnParticles(c.x, y, 5, '#ffffff', 160, 0.25);
+  AudioSys.pop();
+}
+
+if (ANNIV && typeof window !== 'undefined') {
+  // téléphone : on touche l'écran pour souffler les bougies
+  window.addEventListener('pointerdown', () => {
+    AudioSys.init();
+    if (state === ST_TITLE && TOUCH_ONLY) blowCandles();
+  });
+}
+
 // ===================== SAISIE =====================
 window.addEventListener('keydown', (e) => {
   AudioSys.init();
@@ -2361,8 +2684,9 @@ window.addEventListener('keydown', (e) => {
 
   if (state === ST_TITLE || state === ST_OVER) {
     if (e.key === 'Enter') { startGame(); }
-    else if (e.key === 'b' || e.key === 'B') { lastGain = 0; openShop('title', 0); }
+    else if (e.key === 'b' || e.key === 'B') { lastGain = 0; openShop('title', tabIndex('skin')); }
     else if (e.key === 'g' || e.key === 'G') { lastGain = 0; openShop('title', tabIndex('garage')); }
+    else if (ANNIV && state === ST_TITLE && /^[a-z]$/i.test(e.key)) titleLetter(e.key.toUpperCase());
     else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
       const dir = e.key === 'ArrowLeft' ? -1 : 1;
       diffIndex = (diffIndex + dir + DIFFS.length) % DIFFS.length;
@@ -2597,6 +2921,7 @@ function update(dt) {
         // mot entièrement détruit → feu d'artifice, onde de choc, micro-pause
         if (w.dying && w.letters.every(l => l.gone)) {
           words.splice(words.indexOf(w), 1);
+          if (ANNIV) popBalloon(w);
           const c = letterPos(w, (w.text.length - 1) / 2);
           spawnParticles(c.x, c.y, 30, '#7affc0', 260, 0.7, true);
           spawnParticles(c.x, c.y, 20, '#7ad9ff', 220, 0.6, true);
@@ -2618,6 +2943,7 @@ function update(dt) {
     breakTimer -= dt;
     if (breakTimer <= 0) state = ST_PLAY;
   }
+  updateFete(dt);
 
   if (state !== ST_PLAY) return;
 
@@ -2665,7 +2991,8 @@ function update(dt) {
           best = score;
           saveJSON('typerider.best.' + DIFFS[diffIndex].id, best);
         }
-        AudioSys.over();
+        if (ANNIV) { AudioSys.birthday(); scheduleFireworks(6, 0.5); }
+        else AudioSys.over();
         return;
       }
     }
@@ -2680,10 +3007,11 @@ function update(dt) {
       lastGain = 150 + 100 * lastNiveau + combo * 5;
       credits += lastGain;
       saveMeta();
-      openShop('game', 0);
+      openShop('game', tabIndex('skin'));
       AudioSys.wave();
     } else {
       addPopup(W / 2, H * 0.4, 'VAGUE ' + waveNum + ' TERMINEE +' + (100 * waveNum), '#7affc0', 3);
+      if (ANNIV) scheduleFireworks(3, 0.4);
       nextWave();
     }
   }
@@ -2693,7 +3021,7 @@ function update(dt) {
 function vehicleOpts(extra) {
   return Object.assign({
     t: gameT, travel, angle: turret.angle, recoil: turret.recoil,
-    skin: equipped.skin, acc: equipped.acc, white: 0, dark: false,
+    skin: equipped.skin, acc: equipped.acc, char: equipped.char, white: 0, dark: false,
   }, extra);
 }
 
@@ -2871,6 +3199,12 @@ const WORD_KINDS = {
     icon: ['.....#.', '....#..', '..###..', '.#####.', '.#####.', '.#####.', '..###..'],
   },
 };
+if (ANNIV) {
+  Object.assign(WORD_KINDS.or, {
+    col: '#ff9ec4', bg: 'rgba(96,24,64,0.78)', hint: 'MOT CADEAU : UNE SURPRISE !',
+    icon: ['.##.##.', '..###..', '#######', '#..#..#', '#..#..#', '#..#..#', '#######'],
+  });
+}
 
 function drawWords() {
   const sc = wordScale();
@@ -2882,6 +3216,7 @@ function drawWords() {
     const isActive = w === activeWord;
     const danger = !w.dying && w.y > groundY - H * 0.28;
     const K = w.kind ? WORD_KINDS[w.kind] : null;
+    if (ANNIV) drawWordBalloon(w, x + Math.round(wpx / 2) - sc, y - 2 * sc, sc);
 
     // fond du mot
     if (!w.dying) {
@@ -3197,9 +3532,11 @@ function draw(dt) {
   } else if (state === ST_TITLE) {
     drawMarks();
     drawVehicle();
+    if (ANNIV) drawCake();
     drawForeground();
     drawParticles();
     drawRings();
+    if (ANNIV) drawBunting();
     ctx = uictx;
     drawTitle();
     drawPopups();
@@ -3253,7 +3590,9 @@ function drawPlay() {
     drawCenteredPanel([
       { text: 'VAGUE ' + waveNum, scale: 6, color: '#ffe97a', gap: 14 },
       { text: 'MODE ' + DIFFS[diffIndex].name + '  -  NIVEAU ' + niveauCourant() + ' - VAGUE ' + ((waveNum - 1) % WAVES_PER_MANCHE + 1) + '/' + WAVES_PER_MANCHE, scale: 2, color: DIFFS[diffIndex].color, gap: 10 },
-      { text: waveNum === 1 ? 'TAPEZ LES MOTS AVANT L\'IMPACT !' : 'PLUS VITE, PLUS NOMBREUX...', scale: 2, color: '#dfe6ff', gap: 8 },
+      { text: waveNum === 1
+          ? (ANNIV ? 'JOYEUX ANNIVERSAIRE' + (PRENOM ? ' ' + PRENOM : '') + ' ! C\'EST PARTI !' : 'TAPEZ LES MOTS AVANT L\'IMPACT !')
+          : 'PLUS VITE, PLUS NOMBREUX...', scale: 2, color: ANNIV && waveNum === 1 ? '#ffd6e8' : '#dfe6ff', gap: 8 },
       { text: BIOMES[pendingBiome >= 0 ? pendingBiome : (biomeFade ? biomeFade.to : biomeIndex)].name + '   METEO : ' + WEATHER_NAMES[weather], scale: 2, color: '#9fb3e8', gap: 8 },
       { text: blink ? 'PREPAREZ-VOUS' : ' ', scale: 2, color: '#7ad9ff', gap: 0 },
     ]);
@@ -3266,7 +3605,9 @@ function drawPlay() {
     const acc = stats.typed > 0 ? Math.round((stats.typed - stats.errors) / stats.typed * 100) : 100;
     const avgMpm = playT > 5 ? Math.round(((stats.typed - stats.errors) / 5) / (playT / 60)) : 0;
     drawCenteredPanel([
-      { text: 'PARTIE TERMINEE', scale: 5, color: '#ff6b6b', gap: 24 },
+      ANNIV
+        ? { text: 'BRAVO' + (PRENOM ? ' ' + PRENOM : '') + ' !', scale: 5, color: '#ffd93b', gap: 24 }
+        : { text: 'PARTIE TERMINEE', scale: 5, color: '#ff6b6b', gap: 24 },
       { text: 'SCORE ' + score, scale: 4, color: '#ffffff', gap: 14 },
       { text: 'MEILLEUR ' + best + (score >= best && score > 0 ? '  NOUVEAU RECORD !' : ''), scale: 2, color: '#ffe97a', gap: 14 },
       { text: 'MOTS ' + stats.wordsDone + '   PRECISION ' + acc + '/100   MEILLEUR COMBO ' + stats.bestCombo, scale: 2, color: '#9fb3e8', gap: 10 },
@@ -3283,6 +3624,7 @@ function shopRowStatus(it) {
   if (it.garage) {
     return it.i < garageMax ? [it.v.weapon, '#9fb3e8'] : ['NIVEAU ' + (it.i + 1), '#ff6b6b'];
   }
+  if (it.perso) return equipped.char === it.id ? ['CHOISI', '#7affc0'] : ['CHOISIR', '#9fb3e8'];
   if (it.vfx) {
     if (!vfxSupported) return ['INDISPONIBLE', '#ff6b6b'];
     if (it.key !== 'master' && !vfxPrefs.master) return [vfxPrefs[it.key] ? 'EN VEILLE' : 'INACTIF', '#9fb3e8'];
@@ -3429,7 +3771,7 @@ function drawShop(dt) {
 
   const tab = SHOP_TABS[shopTab].id;
   const hint = tab === 'garage' ? 'HAUT/BAS : VOIR UN VEHICULE'
-    : 'ENTREE : ' + (tab === 'vfx' ? 'ACTIVER / COUPER' : tab === 'fx' ? 'ACHETER / ACTIVER' : 'ACHETER / EQUIPER');
+    : 'ENTREE : ' + (tab === 'perso' ? 'CHOISIR' : tab === 'vfx' ? 'ACTIVER / COUPER' : tab === 'fx' ? 'ACHETER / ACTIVER' : 'ACHETER / EQUIPER');
   drawPixelTextOutline(ctx, 'GAUCHE/DROITE : ONGLET   ' + hint, W / 2, H - 54, 2, '#dfe6ff', '#101528', 'center');
   drawPixelTextOutline(ctx, 'ECHAP : ' + (shopReturn === 'game' ? 'CONTINUER LA PARTIE' : 'RETOUR AU TITRE'),
     W / 2, H - 32, 2, '#7ad9ff', '#101528', 'center');
@@ -3448,6 +3790,7 @@ const TITLE_RULES = [
 const TOUCH_ONLY = window.matchMedia && matchMedia('(hover: none) and (pointer: coarse)').matches;
 
 function drawTouchNotice() {
+  if (ANNIV) { drawTouchNoticeAnniv(); return; }
   const s = Math.max(3, Math.min(9, Math.floor((W - 24) / 62)));
   const y = Math.round(H * 0.18);
   drawPixelTextOutline(ctx, 'TYPE', W / 2 - s, y, s, '#ffe97a', '#101528', 'right');
@@ -3463,6 +3806,61 @@ function drawTouchNotice() {
   }
 }
 
+// lettres arc-en-ciel qui ondulent
+function drawRainbowText(text, cx, y, scale) {
+  let x = Math.round(cx - textWidth(text, scale) / 2);
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] !== ' ') {
+      const col = FETE_COLORS[(i + Math.floor(gameT * 3)) % FETE_COLORS.length];
+      const dy = Math.round(Math.sin(gameT * 4 - i * 0.45) * scale * 0.8);
+      drawPixelTextOutline(ctx, text[i], x, y + dy, scale, col, '#101528');
+    }
+    x += 6 * scale;
+  }
+}
+
+const fitScale = (text, max, margin) => Math.max(2, Math.min(max, Math.floor((W - (margin || 40)) / (text.length * 6))));
+const annivName = () => (PRENOM ? PRENOM + ' !' : '!');
+const annivMsg = () => [AGE ? AGE + ' ANS' : '', ANNIV_MSG].filter(Boolean).join(' - ');
+
+function drawTouchNoticeAnniv() {
+  const s1 = fitScale('ANNIVERSAIRE', 6, 24);
+  const name = annivName(), sn = fitScale(name, 8, 24);
+  const msg = annivMsg();
+  let y = 15 * Math.max(2, PX);
+  drawRainbowText('JOYEUX', W / 2, y, s1);
+  y += 7 * s1 + 12;
+  drawRainbowText('ANNIVERSAIRE', W / 2, y, s1);
+  y += 7 * s1 + 16;
+  drawPixelTextOutline(ctx, name, W / 2, y, sn, '#ffd93b', '#101528', 'center');
+  y += 7 * sn + 24;
+  if (msg) {
+    // retour à la ligne si le message est trop long pour l'écran
+    const lines = [];
+    for (const word of msg.split(' ')) {
+      const cur = lines.length ? lines[lines.length - 1] : null;
+      if (cur !== null && textWidth(cur + ' ' + word, 2) <= W - 24) lines[lines.length - 1] = cur + ' ' + word;
+      else lines.push(word);
+    }
+    for (const l of lines) {
+      drawPixelTextShadow(ctx, l, W / 2, y, 2, '#ff9ec4', 'center');
+      y += 22;
+    }
+    y += 12;
+  }
+  const ts = W < 420 ? 2 : 3;
+  const lines = candlesLit ? ['TOUCHE L\'ECRAN POUR', 'SOUFFLER LES BOUGIES'] : ['FAIS UN VOEU !'];
+  for (const l of lines) {
+    drawPixelTextShadow(ctx, l, W / 2, y, ts, '#f2f5ff', 'center');
+    y += 7 * ts + 10;
+  }
+  y += 14;
+  for (const l of ['POUR JOUER : UN ORDINATEUR', 'AVEC UN CLAVIER']) {
+    drawPixelTextShadow(ctx, l, W / 2, y, 2, '#9fb3e8', 'center');
+    y += 24;
+  }
+}
+
 function drawTitle() {
   if (TOUCH_ONLY) { drawTouchNotice(); return; }
   const d = DIFFS[diffIndex];
@@ -3472,44 +3870,71 @@ function drawTitle() {
     'ECHAP : PAUSE   7 : SON   8/9 : CLAVIER   0 : VFX',
   ];
   const meta = (best > 0 ? 'MEILLEUR (' + d.name + ') ' + best + '   ' : '') + 'CREDITS ' + credits;
-  // lettres aérées quand la ligne tient dans l'écran, serrées sinon
-  const all = TITLE_RULES.flat().concat(hints, [meta]);
-  const adv = all.every(t => textWidth(t, 2, 7) <= W - 64) ? 7 : 6;
+  const hs = fitScale('JOYEUX ANNIVERSAIRE', 5);
+  const name = annivName(), ns = fitScale(name, 8);
+  const msg = annivMsg(), ms = textWidth(msg, 3) <= W - 40 ? 3 : 2;
+
+  if (ANNIV && annivGift && !giftShown) {
+    giftShown = true;
+    addPopup(W / 2, H * 0.5, 'CADEAU : +' + annivGift + ' CREDITS ET UN CHAPEAU !', '#ffd93b', 3, 6);
+  }
 
   // blocs : hauteur du texte + espace après (les espaces se resserrent si l'écran est bas)
-  const build = (demo) => {
-    const b = [{ id: 'logo', h: 63, gap: 18 }, { id: 'sub', h: 21, gap: 26 }];
-    if (demo) b.push({ id: 'demo', h: 37, gap: 30 });
-    TITLE_RULES.forEach((grp, gi) => grp.forEach((t, li) => b.push({
-      id: 'rule', t, grp: gi, h: 14,
-      gap: li < grp.length - 1 ? 12 : (gi < TITLE_RULES.length - 1 ? 26 : 32),
+  const rulesFor = (level) => level === 'full' ? TITLE_RULES : level === 'some' ? [TITLE_RULES[0], TITLE_RULES[2]] : [];
+  const build = (demo, level) => {
+    const b = [];
+    if (ANNIV) {
+      b.push({ id: 'ahead', h: 7 * hs, gap: 12 }, { id: 'aname', h: 7 * ns, gap: msg ? 10 : 24 });
+      if (msg) b.push({ id: 'amsg', h: 7 * ms, gap: 22 });
+      if (demo) b.push({ id: 'blow', h: 37, gap: 8 }, { id: 'blowhint', h: 14, gap: 24 });
+    } else {
+      b.push({ id: 'logo', h: 63, gap: 18 }, { id: 'sub', h: 21, gap: 26 });
+      if (demo) b.push({ id: 'demo', h: 37, gap: 30 });
+    }
+    const rules = rulesFor(level);
+    rules.forEach((grp, gi) => grp.forEach((t, li) => b.push({
+      id: 'rule', t, grp: grp === TITLE_RULES[2] ? 2 : gi, h: 14,
+      gap: li < grp.length - 1 ? 12 : (gi < rules.length - 1 ? 26 : 32),
     })));
     b.push({ id: 'dlabel', h: 14, gap: 12 }, { id: 'dname', h: 21, gap: 12 }, { id: 'ddesc', h: 14, gap: 28 });
     b.push({ id: 'enter', h: 28, gap: 28 });
     hints.forEach(t => b.push({ id: 'hint', t, h: 14, gap: 12 }));
     b.push({ id: 'meta', t: meta, h: 14, gap: 0 });
+    b.rules = rules;
     return b;
   };
-  const top = 20, pad = 16;
+  const top = ANNIV ? 15 * Math.max(2, PX) : 20, pad = 16;
   const bottom = turret.y - (V.list[garageMax - 1].h + 10) * vu();
-  let blocks = build(true), k = 1;
   const fit = (bl) => {
     const fixed = bl.reduce((s, x) => s + x.h, 0) + pad * 2;
     const gaps = bl.reduce((s, x) => s + x.gap, 0);
     return Math.min(1, (bottom - top - fixed) / gaps);
   };
-  k = fit(blocks);
-  if (k < 0.7) { blocks = build(false); k = fit(blocks); }
+  // de la mise en page la plus riche à la plus sobre : on garde la première qui tient
+  const layouts = ANNIV
+    ? [[true, 'full'], [true, 'some'], [true, 'none'], [false, 'none']]
+    : [[true, 'full'], [false, 'full'], [false, 'some']];
+  let blocks = null, k = 0;
+  for (const [demo, level] of layouts) {
+    blocks = build(demo, level);
+    k = fit(blocks);
+    if (k >= 0.6) break;
+  }
   k = Math.max(0.3, k);
+  const first = blocks.find(b => b.id === 'rule' || b.id === 'dlabel');
   let y = top;
   for (const b of blocks) {
-    if (b.id === 'rule' && b.grp === 0 && b === blocks.find(x => x.id === 'rule')) y += pad;
+    if (b === first) y += pad;
     b.y = Math.round(y);
     y += b.h + b.gap * k;
   }
 
+  // lettres aérées quand la ligne tient dans l'écran, serrées sinon
+  const all = blocks.rules.flat().concat(hints, [meta, d.desc]);
+  const adv = all.every(t => textWidth(t, 2, 7) <= W - 64) ? 7 : 6;
+
   // panneau sombre derrière tout le texte courant
-  const first = blocks.find(b => b.id === 'rule'), last = blocks[blocks.length - 1];
+  const last = blocks[blocks.length - 1];
   const pw = Math.min(W - 16, Math.max(...all.map(t => textWidth(t, 2, adv))) + 64);
   const px = Math.round(W / 2 - pw / 2), py = first.y - pad, ph = last.y + last.h + pad - py;
   ctx.fillStyle = 'rgba(8,12,28,0.72)';
@@ -3527,6 +3952,26 @@ function drawTitle() {
       drawPixelTextOutline(ctx, 'RIDER', W / 2 + 10, cy + bob, 9, '#7ad9ff', '#101528', 'left');
     } else if (b.id === 'sub') {
       drawPixelTextOutline(ctx, 'UN VOYAGE DE L\'ECRITURE', W / 2, cy + bob, 3, '#ff5d8f', '#101528', 'center');
+    } else if (b.id === 'ahead') {
+      drawRainbowText('JOYEUX ANNIVERSAIRE', W / 2, cy, hs);
+    } else if (b.id === 'aname') {
+      drawPixelTextOutline(ctx, name, W / 2, cy + bob, ns, '#ffd93b', '#101528', 'center');
+    } else if (b.id === 'amsg') {
+      drawPixelTextOutline(ctx, msg, W / 2, cy, ms, '#ff9ec4', '#101528', 'center');
+    } else if (b.id === 'blow') {
+      // le mot à taper pour souffler les bougies, lettre par lettre
+      const txt = candlesLit ? BLOW_WORD : 'FAIS UN VOEU !';
+      const bw2 = textWidth(txt, 3) + 22;
+      ctx.fillStyle = candlesLit ? 'rgba(8,12,28,0.7)' : 'rgba(96,24,64,0.78)';
+      ctx.fillRect(Math.round(W / 2 - bw2 / 2), cy, bw2, 37);
+      const p = candlesLit ? blowProgress() : txt.length;
+      for (let i = 0; i < txt.length; i++) {
+        const col = !candlesLit ? '#ffd6e8' : i < p ? '#7affc0' : (i === p && Math.sin(gameT * 8) > -0.3 ? '#ffe97a' : '#f2f5ff');
+        drawPixelText(ctx, txt[i], W / 2 - textWidth(txt, 3) / 2 + i * 18, cy + 8, 3, col);
+      }
+    } else if (b.id === 'blowhint') {
+      drawPixelTextShadow(ctx, candlesLit ? 'TAPE CE MOT POUR SOUFFLER LES BOUGIES !' : 'LES BOUGIES SONT SOUFFLEES, BRAVO !',
+        W / 2, cy, 2, '#ffd6e8', 'center');
     } else if (b.id === 'demo') {
       // mot de démonstration qui s'écrit
       const demo = 'MONTAGNE';
@@ -3601,6 +4046,8 @@ if (/[?&]debug\b/.test(location.search)) window.__TR = {
   setBiome(i, tod) { setBiome(i, tod || 0); },
   spawn(kind, y) { spawnWord(); const w = words[words.length - 1]; w.kind = kind || null; if (y) w.y = y; return w.text; },
   get freeze() { return freezeT; },
+  get fete() { return { rockets: rockets.length, queue: fwQueue.length, particles: particles.length, lit: candlesLit, gameT }; },
+  fireworks(n) { scheduleFireworks(n || 3, 0.3); },
   get vfx() { return { supported: vfxSupported, active: vfxActive(), prefs: Object.assign({}, vfxPrefs) }; },
   setVfx(key, v) { vfxPrefs[key] = v; },
   setWeather(w) { weather = w; if (w === 'orage') nextBolt = 0.2; },

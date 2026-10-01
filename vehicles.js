@@ -24,6 +24,8 @@ const FIXED = {
   t: '#1f2230', T: '#454a5c', s: '#a3adc2', S: '#6a7389',
   w: '#8fd3ff', W: '#e6f7ff', r: '#ff4a4a', y: '#ffe97a',
   b: '#8a5a33', B: '#5c3a20', n: '#2a3050',
+  // Kimlu : cheveux, reflet, nœud, ombre du nœud, joues
+  u: '#3b2238', U: '#7a4766', v: '#ff5d8f', V: '#c2386f', x: '#ff9ec4',
 };
 
 // jeux de couleurs achetables : m = principale, d = sombre, l = claire, a = accent, g = lueur
@@ -88,7 +90,43 @@ const SPRITES = {
     '.aaajjjjjqq.',
     '..aa.qqqqqq.',
   ],
+  // Kimlu : mêmes dimensions et mêmes points d'attache que le pilote d'origine
+  torsoK: [
+    '...vv.uuuu..',
+    '..vVvuuuuuu.',
+    '...vuuuUuuuu',
+    '..uuuuukkkk.',
+    '.uuukkkkokk.',
+    '.uuukkkkkkkK',
+    'uuu.kkkkxkk.',
+    'uu..KKkkk...',
+    'uuaajjjjjj..',
+    'uaaajjJJJjj.',
+    'uaaajjjjjjj.',
+    '.aAajjjjjjj.',
+    '.aaajjjjjjqq',
+    '..aa.qqqqqqq',
+  ],
+  helmetK: [
+    '....mmmm....',
+    '...mmvmmmm..',
+    '..mmmmmmmmm.',
+    '..mmlmgggggg',
+    '.ummmgWggggg',
+    'uummmgggggg.',
+    'uu.mmmmmmmd.',
+    'u...SSkkk...',
+    'uuaajjjjjj..',
+    'uaaajjJJJjj.',
+    'uaaajjjjjjj.',
+    '.aAajjjjjjj.',
+    '.aaajjjjjjqq',
+    '..aa.qqqqqqq',
+  ],
 };
+
+// sprite du pilote choisi (o.char === 'kimlu' → variante K)
+function pilot(o, base) { return o.char === 'kimlu' ? base + 'K' : base; }
 
 const sprCache = {};
 function sprite(name, P, key) {
@@ -226,6 +264,15 @@ function accessory(acc, P, head, back, t) {
     R(ink, hx - 4, hy + 1, 9, 1);
     R(ink, hx - 3, hy - 4, 7, 5);
     R(P.a, hx - 3, hy, 7, 1);
+  } else if (acc === 'acc_fete') {
+    // chapeau pointu de fête à rayures, avec pompon
+    for (let k = 0; k < 7; k++) {
+      const w = Math.max(1, 7 - k);
+      R(k % 2 ? '#ffd93b' : '#ff5d8f', hx - Math.floor(w / 2), hy + 1 - k, w, 1);
+    }
+    R('#7ad9ff', hx - 2, hy, 1, 1);
+    R('#7ad9ff', hx + 1, hy - 2, 1, 1);
+    R('#ffffff', hx - 1, hy - 7, 2, 2);
   } else if (acc === 'acc_couronne') {
     R('#ffd93b', hx - 3, hy - 1, 7, 2);
     R('#ffd93b', hx - 3, hy - 3, 1, 2);
@@ -266,7 +313,7 @@ const VEHICLES = [
       const f1x = 3 * Math.cos(ph), f1y = -2 + Math.min(0, Math.sin(ph)) * 2.5;
       const f2x = 3 * Math.cos(ph + Math.PI), f2y = -2 + Math.min(0, Math.sin(ph + Math.PI)) * 2.5;
       leg(P.P, P.B, 0, -9 + by, f2x, f2y, 4, 4.8);
-      g.drawImage(sprite('torso', P, o.skin + 'skin'), -6, -23 + by);
+      g.drawImage(sprite(pilot(o, 'torso'), P, o.skin + 'skin'), -6, -23 + by);
       leg(P.p, P.B, 1, -9 + by, f1x, f1y, 4, 4.8);
       return { mount: [3.5, -13.5 + by], head: [0.5, -23 + by], back: [-4, -15 + by],
                contacts: [[f1x, 0], [f2x, 0]] };
@@ -289,7 +336,7 @@ const VEHICLES = [
       R(P.m, -8, -6, 14, 1);
       R(P.d, -8, -5, 14, 1);
       R(P.S, -10, -6, 2, 1);
-      g.drawImage(sprite('torso', P, o.skin + 'skin'), -8, -29);
+      g.drawImage(sprite(pilot(o, 'torso'), P, o.skin + 'skin'), -8, -29);
       leg(P.p, P.B, -1, -15, 0, -9, 3.4, 3.6);
       line(P.j, -1, -19, 1, -21, 2);
       return { mount: [1.5, -19.5], head: [-1.5, -29], back: [-6, -21], contacts: [[-6, 0], [6, 0]] };
@@ -319,7 +366,7 @@ const VEHICLES = [
       R(P.a, 1, -17, 2, 1);
       R(P.B, -6, -14, 5, 1);
       disc(P.S, -0.5, -4.5, 1.6);
-      g.drawImage(sprite('torso', P, o.skin + 'skin'), -9, -29);
+      g.drawImage(sprite(pilot(o, 'torso'), P, o.skin + 'skin'), -9, -29);
       leg(P.p, P.B, -2, -15, p1x, p1y - 1, 5, 5.6);
       line(P.j, -2, -19, 2, -17, 2);
       return { mount: [0.5, -19.5], head: [-2.5, -29], back: [-7, -21], contacts: [[-8, 0], [8, 0]] };
@@ -333,7 +380,7 @@ const VEHICLES = [
       const ang = o.travel / 4;
       const y = Math.round(Math.sin(o.travel * 0.15) * 0.6);
       R(P.B, -11, -15 + y, 2, 5);
-      g.drawImage(sprite('torso', P, o.skin + 'cream'), -8, -21 + y);
+      g.drawImage(sprite(pilot(o, 'torso'), P, o.skin + 'cream'), -8, -21 + y);
       R(P.m, -15, -12 + y, 8, 2);
       R(P.l, -15, -12 + y, 8, 1);
       R(P.m, -16, -10 + y, 32, 6);
@@ -378,7 +425,7 @@ const VEHICLES = [
       R(P.B, -8, -12, 7, 2);
       R(P.m, -11, -13, 4, 2);
       R(P.r, -12, -13, 1, 1);
-      g.drawImage(sprite('helmet', P, o.skin + 'cream'), -10, -27);
+      g.drawImage(sprite(pilot(o, 'helmet'), P, o.skin + 'cream'), -10, -27);
       R(P.m, -2, -13, 8, 3);
       R(P.l, -1, -13, 6, 1);
       R(P.a, -1, -12, 6, 1);
@@ -399,7 +446,7 @@ const VEHICLES = [
     draw(P, o) {
       const ang = o.travel / 5.5;
       const y = Math.round(Math.sin(o.travel * 0.21) * 0.9);
-      g.drawImage(sprite('helmet', P, o.skin + 'cream'), -8, -25 + y);
+      g.drawImage(sprite(pilot(o, 'helmet'), P, o.skin + 'cream'), -8, -25 + y);
       R(P.S, -15, -13 + y, 4, 5);
       R(P.T, -15, -12 + y, 4, 1);
       R(P.T, -15, -10 + y, 4, 1);
@@ -430,7 +477,7 @@ const VEHICLES = [
     draw(P, o) {
       const ang = o.travel / 5.5;
       const y = Math.round(Math.sin(o.travel * 0.17) * 0.7);
-      g.drawImage(sprite('torso', P, o.skin + 'cream'), -7, -28 + y);
+      g.drawImage(sprite(pilot(o, 'torso'), P, o.skin + 'cream'), -7, -28 + y);
       R(P.m, -16, -14 + y, 32, 8);
       R(P.l, -16, -14 + y, 32, 1);
       R(P.d, -16, -7 + y, 32, 1);
@@ -463,7 +510,7 @@ const VEHICLES = [
     segs: [[3, 4, 'S'], [2, 2, 'S'], [1, 3, 'g'], [2, 2, 'S'], [1, 3, 'g'], [1, 2, 'e']],
     draw(P, o) {
       const ang = o.travel / 4.5;
-      g.drawImage(sprite('torso', P, o.skin + 'cream'), -8, -28);
+      g.drawImage(sprite(pilot(o, 'torso'), P, o.skin + 'cream'), -8, -28);
       R(P.S, -11, -22, 3, 2);
       R(P.m, -9, -20, 14, 5);
       R(P.l, -9, -20, 14, 1);
@@ -492,7 +539,7 @@ const VEHICLES = [
     segs: [[4, 5, 'S'], [9, 2, 'S'], [2, 4, 'T']],
     draw(P, o) {
       const tr = o.travel;
-      g.drawImage(sprite('torso', P, o.skin + 'cream'), -8, -27);
+      g.drawImage(sprite(pilot(o, 'torso'), P, o.skin + 'cream'), -8, -27);
       R(P.S, -14, -21, 3, 2);
       R(P.m, -11, -19, 20, 6);
       R(P.l, -11, -19, 20, 1);

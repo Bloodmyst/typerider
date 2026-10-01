@@ -60,6 +60,24 @@ Le jeu est un site statique : il se publie tel quel, sans étape de construction
 Les sauvegardes (crédits, records, achats) sont propres à chaque adresse web : la version en ligne
 repart de zéro. Le hook de test `window.__TR` n'existe que si l'adresse contient `?debug`.
 
+## Édition anniversaire (branche `anniversaire`)
+
+Une version spéciale pour fêter un anniversaire, réglable dans **`anniversaire.js`**
+(prénom, âge, message, crédits offerts ; `actif: false` pour revenir au jeu normal) :
+
+- **Kimlu**, nouvelle héroïne (cheveux longs, queue de cheval, nœud rose), sur les 9 véhicules ;
+  le choix du pilote se fait dans l'onglet **PERSO** de la boutique.
+- Écran titre : **JOYEUX ANNIVERSAIRE** en lettres arc-en-ciel, le prénom, le message,
+  guirlandes de fanions, pluie de confettis, ballons qui montent dans le ciel.
+- Un **gâteau** à bougies (autant que l'âge indiqué) : taper **SOUFFLE** pour les souffler
+  (ou toucher l'écran sur téléphone), avec la mélodie « Joyeux anniversaire » et un feu d'artifice.
+  Taper le **prénom** sur l'écran titre lance aussi un feu d'artifice.
+- En jeu : chaque mot est accroché à un **ballon** qui éclate quand le mot est détruit,
+  40 % de mots de fête (gâteau, bougie, confetti…), le prénom tombe parfois du ciel,
+  feux d'artifice la nuit et en fin de vague, **mot cadeau** (crédits + bonus).
+- Cadeau au premier lancement : crédits, couleur néon rose, **chapeau de fête**, confettis de victoire.
+- Fin de partie : « BRAVO KIMLU ! » avec la chanson et un feu d'artifice.
+
 ## Difficultés
 
 Choix sur l'écran titre avec les **flèches ← →** (mémorisé, meilleur score séparé par mode) :

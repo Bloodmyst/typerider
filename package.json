@@ -35,6 +35,7 @@
       "game.js",
       "vehicles.js",
       "vfx.js",
+      "anniversaire.js",
       "favicon.svg",
       "build/icon.png",
       "electron/**"
