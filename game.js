@@ -3666,7 +3666,12 @@ function drawShopPreview(x, y, w, h, dt) {
   ctx.fillRect(x, y, 2, h);
   ctx.fillRect(x + w - 2, y, 2, h);
 
-  const u = vu();
+  // échelle qui fait tenir le véhicule et son pilote (chapeau, drapeau, arme tendue compris)
+  // dans le cadre ; toujours paire pour garder des pixels fins nets
+  const vdef = V.list[tier - 1];
+  const hCells = V.height(tier, equipped.char) + 12, wCells = vdef.halfW * 2 + 24;
+  let u = vu();
+  while (u > 2 && (hCells * u > h - 40 || wCells * u > w - 8)) u -= 2;
   const gy = y + h - 30;
   ctx.fillStyle = pal.grass;
   ctx.fillRect(x + 2, gy, w - 4, 6);
@@ -3743,7 +3748,7 @@ function drawShop(dt) {
   const colW = wide ? Math.min(380, W / 2 - 30) : W - 40;
   const listL = wide ? W / 2 - 10 - colW + 12 : 32;
   const listR = wide ? W / 2 - 10 : W - 20;
-  const pvH = 220;
+  const pvH = Math.round(Math.max(200, Math.min(300, H * 0.32)));
   drawShopPreview(wide ? W / 2 + 10 : 20, y, colW, pvH, dt);
   const listY = wide ? y + 8 : y + pvH + 76;
 
