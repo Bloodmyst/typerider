@@ -2014,7 +2014,8 @@ let vfxPrefs = Object.assign(
   loadJSON('typerider.vfx', {}));
 let shocks = [], lights = [], vfxPulse = 0, vfxShown = null;
 
-function vfxActive() { return vfxSupported && vfxPrefs.master; }
+// VFX.ok tombe à faux si le navigateur coupe WebGL (fréquent sur iPhone) : on repasse alors en 2D
+function vfxActive() { return vfxSupported && VFX.ok && vfxPrefs.master; }
 
 function addShock(x, y, maxR, str, dur) {
   shocks.push({ x, y, maxR, str, t: 0, dur });
@@ -2641,11 +2642,14 @@ function popBalloon(w) {
 }
 
 if (ANNIV && typeof window !== 'undefined') {
-  // téléphone : on touche l'écran pour souffler les bougies
-  window.addEventListener('pointerdown', () => {
+  // téléphone : on touche l'écran pour souffler les bougies. Sur iPhone, le son ne peut démarrer
+  // qu'au moment où le doigt quitte l'écran : on attend donc la fin du toucher.
+  const onTap = () => {
     AudioSys.init();
     if (state === ST_TITLE && TOUCH_ONLY) blowCandles();
-  });
+  };
+  window.addEventListener('touchend', onTap, { passive: true });
+  window.addEventListener('pointerup', (e) => { if (e.pointerType !== 'touch') onTap(); });
 }
 
 // ===================== SAISIE =====================
@@ -3853,12 +3857,13 @@ function drawTouchNoticeAnniv() {
   const avail = bottom - top;
   const wrap = (text, scale) => {
     const lines = [];
-    for (const word of text.split(' ')) {
+    // un signe de ponctuation isolé (« JOURNEE ! ») reste collé au mot qui le précède
+    for (const word of text.replace(/ ([!?:;])/g, '\u00a0$1').split(' ')) {
       const cur = lines.length ? lines[lines.length - 1] : null;
       if (cur !== null && textWidth(cur + ' ' + word, scale) <= W - 24) lines[lines.length - 1] = cur + ' ' + word;
       else lines.push(word);
     }
-    return lines;
+    return lines.map(l => l.replace(/\u00a0/g, ' ')); // la police pixel ne connaît que l'espace normale
   };
   // du plus grand au plus petit : on garde la première taille qui tient en hauteur
   const tryLayout = (s1, oneLine, withPlay) => {

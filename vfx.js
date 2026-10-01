@@ -250,8 +250,11 @@ function target(w, h) {
   return { tex, fb, w, h };
 }
 
+let lost = false;
 function init(c) {
   glCanvas = c;
+  // iOS coupe parfois WebGL (mémoire, onglet en arrière-plan) : le jeu repasse alors sans effets
+  c.addEventListener('webglcontextlost', (e) => { e.preventDefault(); lost = true; });
   try {
     gl = c.getContext('webgl', { alpha: false, antialias: false, depth: false, stencil: false, premultipliedAlpha: false });
     if (!gl) return false;
@@ -316,7 +319,7 @@ function blur(src, dst, dx, dy) {
          shocks: [{x, y, r, s}] et lights: [{x, y, r, i, col: [r,g,b]}] en pixels,
          heat, rain, pulse (0..1), thr : seuil de lueur (plus bas la nuit) } */
 function render(src, p) {
-  if (!gl) return;
+  if (!gl || lost) return;
   gl.bindTexture(gl.TEXTURE_2D, srcTex);
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src);
@@ -385,7 +388,7 @@ function render(src, p) {
 
 window.TRVfx = {
   init, resize, render,
-  get ok() { return !!gl; },
+  get ok() { return !!gl && !lost; },
 };
 
 })();
